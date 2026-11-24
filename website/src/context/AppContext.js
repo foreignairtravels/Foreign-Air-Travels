@@ -1,0 +1,310 @@
+"use client";
+
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+
+const API_URL = (
+  process.env.NEXT_PUBLIC_BACKEND_URL ||
+  process.env.NEXT_PUBLIC_BACKEND_URL ||
+  "http://localhost:5000"
+).replace(/\/$/, "");
+const TOKEN_KEY = "userToken";
+export const DASHBOARD_POPUP_SESSION_KEY = "dashboardWelcomePopupShown";
+
+const AppContext = createContext(null);
+
+export function AppProvider({ children }) {
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  const tokenRef = useRef(null);
+  const didInit = useRef(false); // dev mode mein double call rokne ke liye
+
+  // ---------- Session helpers ----------
+  const clearSession = useCallback(() => {
+    tokenRef.current = null;
+    localStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(DASHBOARD_POPUP_SESSION_KEY);
+    setUser(null);
+  }, []);
+
+  // ---------- Core request (sirf is file ke andar use hoga) ----------
+  const request = useCallback(
+    async (path, { method = "GET", body, cache = "default", isFormData = false } = {}) => {
+      try {
+        const res = await fetch(`${API_URL}${path}`, {
+          method,
+          cache,
+          headers: {
+            ...(!isFormData ? { "Content-Type": "application/json" } : {}),
+            ...(tokenRef.current
+              ? { Authorization: `Bearer ${tokenRef.current}` }
+              : {}),
+          },
+          body: isFormData ? body : body ? JSON.stringify(body) : undefined,
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        // Token expire/invalid ho to session khatam
+        if (res.status === 401 && tokenRef.current) clearSession();
+
+        return { ok: res.ok && data.success !== false, status: res.status, data };
+      } catch (error) {
+        return {
+          ok: false,
+          status: 0,
+          data: { message: "Unable to connect to the server. Please try again shortly." },
+        };
+      }
+    },
+    [clearSession]
+  );
+
+  // ---------- Page load par token verify (sirf ek baar) ----------
+  useEffect(() => {
+    if (didInit.current) return;
+    didInit.current = true;
+
+    const verify = async () => {
+      const saved = localStorage.getItem(TOKEN_KEY);
+      if (!saved) {
+        setAuthLoading(false);
+        return;
+      }
+
+      tokenRef.current = saved;
+      const { ok, data } = await request("/api/user/me");
+
+      if (ok) setUser(data.user);
+      else clearSession();
+
+      setAuthLoading(false);
+    };
+
+    verify();
+  }, [request, clearSession]);
+
+  // =====================================================
+  // API SECTIONS (har nayi API yahan add hogi)
+  // =====================================================
+
+  // ---------- AUTH ----------
+  const register = useCallback(
+    async (details) => {
+      const { ok, data } = await request("/api/user/register", {
+        method: "POST",
+        body: details,
+      });
+      return { ok, message: data.message };
+    },
+    [request]
+  );
+
+  const login = useCallback(
+    async (email, password) => {
+      const { ok, data } = await request("/api/user/login", {
+        method: "POST",
+        body: { email, password },
+      });
+
+      if (ok) {
+        tokenRef.current = data.token;
+        localStorage.setItem(TOKEN_KEY, data.token);
+        setUser(data.user);
+        return { ok: true };
+      }
+
+      // code === "EMAIL_NOT_VERIFIED" ho to UI "dobara email bhejo" dikha sakti hai
+      return { ok: false, message: data.message || "Login failed.", code: data.code };
+    },
+    [request]
+  );
+
+  const requestPasswordReset = useCallback(
+    async (email) => {
+      const { ok, data } = await request("/api/user/forgot-password", {
+        method: "POST",
+        body: { email },
+      });
+      return { ok, message: data.message };
+    },
+    [request]
+  );
+
+  const verifyPasswordResetCode = useCallback(
+    async (email, code) => {
+      const { ok, data } = await request("/api/user/verify-password-reset-code", {
+        method: "POST",
+        body: { email, code },
+      });
+      return { ok, resetToken: data.resetToken, message: data.message };
+    },
+    [request]
+  );
+
+  const resetPassword = useCallback(
+    async ({ email, resetToken, newPassword }) => {
+      const { ok, data } = await request("/api/user/reset-password", {
+        method: "POST",
+        body: { email, resetToken, newPassword },
+      });
+      return { ok, message: data.message };
+    },
+    [request]
+  );
+
+  const updatePassword = useCallback(
+    async (currentPassword, newPassword) => {
+      const { ok, data } = await request("/api/user/me/password", {
+        method: "PUT",
+        body: { currentPassword, newPassword },
+      });
+      if (ok) setUser(data.user);
+      return { ok, message: data.message };
+    },
+    [request]
+  );
+
+  const getMe = useCallback(async () => {
+    const { ok, data } = await request("/api/user/me");
+    if (ok) setUser(data.user);
+    return { ok, user: data.user, message: data.message };
+  }, [request]);
+
+  const updateMe = useCallback(
+    async (updates) => {
+      const { ok, data } = await request("/api/user/me", {
+        method: "PUT",
+        body: updates,
+      });
+      if (ok) setUser(data.user);
+      return { ok, user: data.user, message: data.message };
+    },
+    [request]
+  );
+
+  const updateCompanyLogo = useCallback(
+    async (file) => {
+      const formData = new FormData();
+      formData.append("logo", file);
+      const { ok, data } = await request("/api/user/me/company-logo", {
+        method: "POST",
+        body: formData,
+        isFormData: true,
+      });
+      if (ok) setUser(data.user);
+      return { ok, user: data.user, message: data.message };
+    },
+    [request]
+  );
+
+  const deleteMe = useCallback(
+    async (password) => {
+      const { ok, data } = await request("/api/user/me", {
+        method: "DELETE",
+        body: { password },
+      });
+      if (ok) clearSession();
+      return { ok, message: data.message };
+    },
+    [request, clearSession]
+  );
+
+  const logout = useCallback(() => clearSession(), [clearSession]);
+
+  // ---------- PACKAGES (public, token nahi chahiye) ----------
+  const getPackages = useCallback(() => request("/api/packages"), [request]);
+
+  // ---------- GROUP TICKETS (public, token nahi chahiye) ----------
+  const getGroupTicketCategories = useCallback(() => request("/api/group-ticket-categories", { cache: "no-store" }), [request]);
+  const getGroupTickets = useCallback(
+    (category) => request(`/api/group-tickets${category ? `?category=${encodeURIComponent(category)}` : ""}`),
+    [request]
+  );
+  const createGroupBooking = useCallback(
+    (body, invoiceLogo, invoiceLogoSource) => {
+      const booking = { ...body, invoiceLogoSource };
+      if (!invoiceLogo) return request("/api/group-bookings", { method: "POST", body: booking });
+
+      const formData = new FormData();
+      formData.append("booking", JSON.stringify(booking));
+      formData.append("logo", invoiceLogo);
+      return request("/api/group-bookings", { method: "POST", body: formData, isFormData: true });
+    },
+    [request]
+  );
+  const getMyGroupBookings = useCallback(() => request("/api/group-bookings/me"), [request]);
+  const updateMyGroupBookingStatus = useCallback(
+    (id, status) => request(`/api/group-bookings/me/${id}/status`, { method: "PATCH", body: { status } }),
+    [request]
+  );
+
+  // ---------- SERVICES (public, token nahi chahiye) ----------
+  const getServices = useCallback(() => request("/api/services"), [request]);
+
+  // ---------- AIRLINES (public, token nahi chahiye) ----------
+  const getAirlines = useCallback(() => request("/api/airlines"), [request]);
+
+  // ---------- COUNTRIES (public, token nahi chahiye) ----------
+  const getCountries = useCallback(() => request("/api/countries"), [request]);
+
+  // ---------- BANK ACCOUNTS (logged-in user, token request() khud bhejta hai) ----------
+  const getBankAccounts = useCallback(() => request("/api/bank-accounts"), [request]);
+
+  // ---------- ANNOUNCEMENTS (public, token nahi chahiye) ----------
+  const getAnnouncements = useCallback(() => request("/api/announcements"), [request]);
+  
+  // ---------- POPUP IMAGES (public, token nahi chahiye) ----------
+  const getPopupImages = useCallback(() => request("/api/popup-images"), [request]);
+
+  // ---------- Aage ki APIs yahan add hongi (bookings, profile wagera) ----------
+
+  const value = useMemo(
+    () => ({
+      user,
+      authLoading,
+      register,
+      login,
+      requestPasswordReset,
+      verifyPasswordResetCode,
+      resetPassword,
+      updatePassword,
+      getMe,
+      updateMe,
+      updateCompanyLogo,
+      deleteMe,
+      logout,
+      getPackages,
+      getGroupTicketCategories,
+      getGroupTickets,
+      createGroupBooking,
+      getMyGroupBookings,
+      updateMyGroupBookingStatus,
+      getServices,
+      getAirlines,
+      getCountries,
+      getBankAccounts,
+      getAnnouncements,
+      getPopupImages,
+    }),
+    [user, authLoading, register, login, requestPasswordReset, verifyPasswordResetCode, resetPassword, updatePassword, getMe, updateMe, updateCompanyLogo, deleteMe, logout, getPackages, getGroupTicketCategories, getGroupTickets, createGroupBooking, getMyGroupBookings, updateMyGroupBookingStatus, getServices, getAirlines, getCountries, getBankAccounts,
+      getAnnouncements, getPopupImages,
+    ]
+  );
+
+  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+}
+
+export function useApp() {
+  const context = useContext(AppContext);
+  if (!context) throw new Error("useApp must be used within an AppProvider.");
+  return context;
+}

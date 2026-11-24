@@ -1,0 +1,50 @@
+import {
+  FiGrid,
+  FiMap,
+  FiUsers,
+  FiMessageSquare,
+  FiLayers,
+  FiSend,
+  FiGlobe,
+  FiCreditCard,
+  FiBell,
+  FiImage,
+  FiBookOpen,
+  FiRefreshCw,
+} from "react-icons/fi";
+
+import { LuPlane } from "react-icons/lu";
+
+export const navItems = [
+  { label: "Dashboard", href: "/dashboard", icon: FiGrid },
+  {
+    label: "Website",
+    icon: FiGlobe,
+    children: [
+      { label: "Packages", href: "/dashboard/packages", icon: FiMap },
+      { label: "Services", href: "/dashboard/services", icon: FiLayers },
+      { label: "Airlines", href: "/dashboard/airlines", icon: FiSend },
+      { label: "Countries", href: "/dashboard/countries", icon: FiGlobe },
+      { label: "Bank Accounts", href: "/dashboard/bank-accounts", icon: FiCreditCard },
+      { label: "Announcements", href: "/dashboard/announcements", icon: FiBell },
+      { label: "Popup Images", href: "/dashboard/popup-images", icon: FiImage },
+    ],
+  },
+  {
+    label: "Website Dashboard",
+    icon: FiGrid,
+    children: [
+      { label: "Group Ticket Categories", href: "/dashboard/group-ticket-categories", icon: FiLayers },
+      { label: "Group Tickets", href: "/dashboard/group-tickets", icon: LuPlane },
+      { label: "Ticket Sync", href: "/dashboard/ticket-sync", icon: FiRefreshCw },
+      { label: "Customers", href: "/dashboard/customers", icon: FiUsers },
+      { label: "Inquiries", href: "/dashboard/inquiries", icon: FiMessageSquare },
+      { label: "Agent Ledgers", href: "/dashboard/ledger", icon: FiBookOpen },
+    ],
+  },
+];
+
+export const isActivePath = (href, pathname) =>
+  href === "/dashboard"
+    ? pathname === href
+    : pathname === href || pathname.startsWith(`${href}/`);
