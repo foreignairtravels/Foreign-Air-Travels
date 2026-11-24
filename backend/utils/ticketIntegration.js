@@ -95,8 +95,14 @@ export const normalizeIntegrationPayload = (payload, selectedCategorySlug = '') 
       throw new Error('Source categories must have unique slug and name values.');
     }
     seenCategorySlugs.add(slug);
-    return { slug, name };
+    return {
+      slug,
+      name,
+      image: String(category?.image || '').trim().slice(0, 2048),
+      logo: String(category?.logo || '').trim().slice(0, 2048),
+    };
   });
+  const categoriesBySlug = new Map(categories.map((category) => [category.slug, category]));
   if (selectedCategorySlug && !seenCategorySlugs.has(selectedCategorySlug)) {
     throw new Error('The selected source category is no longer available.');
   }
@@ -111,6 +117,8 @@ export const normalizeIntegrationPayload = (payload, selectedCategorySlug = '') 
   };
   const tickets = payload.data.map((ticket) => {
     const sourceId = text(ticket.sourceId || ticket._id, 'sourceId', 120);
+    const sourceCategorySlug = String(ticket.category?.slug || ticket.categorySlug || '').trim().toLowerCase();
+    const sourceCategory = categoriesBySlug.get(sourceCategorySlug);
     const departureDate = new Date(ticket.departureDate);
     if (!sourceId || seenIds.has(sourceId)) throw new Error('Source tickets must have unique sourceId values.');
     seenIds.add(sourceId);
@@ -154,7 +162,10 @@ export const normalizeIntegrationPayload = (payload, selectedCategorySlug = '') 
     const currency = text(ticket.currency || 'SAR', 'currency', 3).toUpperCase();
     return {
       sourceId,
-      sourceCategorySlug: String(ticket.category?.slug || ticket.categorySlug || '').trim().toLowerCase(),
+      sourceCategorySlug,
+      sourceCategoryName: String(ticket.category?.name || sourceCategory?.name || '').trim().slice(0, 120),
+      sourceCategoryImage: String(ticket.category?.image || sourceCategory?.image || '').trim().slice(0, 2048),
+      sourceCategoryLogo: String(ticket.category?.logo || sourceCategory?.logo || '').trim().slice(0, 2048),
       airline: text(ticket.airline, 'airline name', 120),
       airlineLogo: String(ticket.airlineLogo || '').trim().slice(0, 2048),
       groupName: text(ticket.groupName, 'group name', 200),

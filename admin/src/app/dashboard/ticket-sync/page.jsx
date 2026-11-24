@@ -56,7 +56,7 @@ export default function TicketSyncPage() {
       getTicketAccessEmails(),
     ]);
     if (!categoryResult.ok) setError(categoryResult.data.message || "Ticket categories could not be loaded.");
-    else setCategories(categoryResult.data.data);
+    else setCategories(categoryResult.data.data.filter((category) => !category.isSyncImported));
     if (!integrationResult.ok) setError(integrationResult.data.message || "Connected websites could not be loaded.");
     else setIntegrations(integrationResult.data.data);
     if (!accessResult.ok) setError(accessResult.data.message || "Access emails could not be loaded.");
@@ -263,8 +263,8 @@ export default function TicketSyncPage() {
           <Field label="Access email"><input type="email" value={connection.accessEmail} onChange={(event) => updateConnection("accessEmail", event.target.value)} required maxLength={254} className={inputClass} placeholder="Email that has ticket access on source website" /></Field>
           <Field label="Account password"><input type="password" value={connection.password} onChange={(event) => updateConnection("password", event.target.value)} maxLength={200} autoComplete="new-password" className={inputClass} placeholder={editing?.provider === "alhaider" ? "Leave blank to keep the saved login" : "Only for login websites like Al Haider"} /></Field>
           <Field label="Local ticket category">
-            <select value={connection.category} onChange={(event) => updateConnection("category", event.target.value)} required className={`dropdown-select ${inputClass}`}>
-              <option value="">Select category</option>
+            <select value={connection.category} onChange={(event) => updateConnection("category", event.target.value)} className={`dropdown-select ${inputClass}`}>
+              <option value="">All categories (use source categories)</option>
               {categories.map((category) => <option key={category._id} value={category._id}>{category.name}</option>)}
             </select>
           </Field>
@@ -292,12 +292,12 @@ export default function TicketSyncPage() {
               </button>
             </div>
             <p className="mt-1 text-xs text-slate-500">
-              “All categories” syncs every source category. Choose one to sync only that category. Local category is the fallback when names/slugs do not match.
+              “All categories” keeps each source category separate and imports its image. A selected local category is used only when a source category has no match.
             </p>
           </div>}
-          {!categories.length && <p className="text-sm text-amber-700 sm:col-span-2">Create a Group Ticket Category before connecting a website.</p>}
+          {!categories.length && <p className="text-sm text-amber-700 sm:col-span-2">You can select “All categories” to import the source categories, or create a local category to use as a fallback.</p>}
           <div className="flex flex-wrap gap-2 sm:col-span-2">
-            <button disabled={saving || !categories.length} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#FF6B35] px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60">
+            <button disabled={saving} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#FF6B35] px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60">
               <FiLink /> {saving ? "Connecting..." : editing ? "Save connection" : "Connect and sync"}
             </button>
             {editing && <button type="button" onClick={() => { setEditing(null); setConnection(emptyConnection); }} className="inline-flex items-center gap-2 rounded-xl bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-700"><FiX /> Cancel edit</button>}
@@ -316,7 +316,7 @@ export default function TicketSyncPage() {
                     <h3 className="break-words font-semibold text-[#003366]">{item.name}</h3>
                     <p className="mt-1 break-all text-sm text-slate-500">{item.baseUrl}</p>
                     <p className="mt-1 text-xs text-slate-500">
-                      {item.provider === "alhaider" ? "Login email" : "Access email"}: {item.accessEmail || "Not set"}{item.loginExpiresAt ? ` · Login valid till: ${formatDate(item.loginExpiresAt)}` : ""} · Source category: {item.sourceCategorySlug || "All categories"} · Local fallback: {item.category?.name || "Unavailable"} · {item.lastSyncCount} tickets · Last sync: {formatDate(item.lastSyncAt)}
+                      {item.provider === "alhaider" ? "Login email" : "Access email"}: {item.accessEmail || "Not set"}{item.loginExpiresAt ? ` · Login valid till: ${formatDate(item.loginExpiresAt)}` : ""} · Source category: {item.sourceCategorySlug || "All categories"} · Local fallback: {item.category?.name || "All categories"} · {item.lastSyncCount} tickets · Last sync: {formatDate(item.lastSyncAt)}
                     </p>
                     {item.lastSyncError && <p role="alert" className="mt-2 text-sm text-red-700">Sync error: {item.lastSyncError}</p>}
                   </div>

@@ -26,7 +26,8 @@ const categoryFields = (body) => {
 
 export const getGroupTicketCategories = async (req, res) => {
   try {
-    const categories = await GroupTicketCategory.find().sort({ createdAt: 1 });
+    const filter = req.query.all === 'true' ? {} : { isSyncImported: { $ne: true } };
+    const categories = await GroupTicketCategory.find(filter).sort({ createdAt: 1 });
     res.json({ success: true, data: categories });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -36,9 +37,19 @@ export const getGroupTicketCategories = async (req, res) => {
 export const createGroupTicketCategory = async (req, res) => {
   try {
     const fields = categoryFields(req.body);
+    const slug = makeSlug(fields.name);
+    const importedCategory = await GroupTicketCategory.findOneAndUpdate(
+      { slug, isSyncImported: true },
+      { $set: { ...fields, isSyncImported: false } },
+      { new: true, runValidators: true }
+    );
+    if (importedCategory) {
+      return res.status(200).json({ success: true, message: 'Category added', data: importedCategory });
+    }
     const item = await GroupTicketCategory.create({
       ...fields,
       slug: await uniqueSlug(fields.name),
+      isSyncImported: false,
     });
     res.status(201).json({ success: true, message: 'Category created', data: item });
   } catch (error) {

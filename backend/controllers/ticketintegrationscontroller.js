@@ -15,6 +15,7 @@ import {
 
 const syncIntervalMs = 15 * 60 * 1000;
 const syncLockMs = 2 * 60 * 1000;
+const initialCategorySyncWindowMs = 30 * 1000;
 const fareFields = ['adultFare', 'childFare', 'infantFare'];
 const normalizeEmail = (value) => {
   const email = String(value ?? '').trim().toLowerCase();
@@ -46,24 +47,83 @@ const safeIntegration = (integration) => ({
 
 const applySourceTickets = async (integration, tickets) => {
   const existing = await GroupTicket.find({ sourceIntegration: integration._id })
-    .select('sourceTicketId reservedBooking airlineId adultFare childFare infantFare priceOverrides currency currencyOverride')
+    .select('sourceTicketId category createdAt reservedBooking airlineId adultFare childFare infantFare priceOverrides currency currencyOverride')
     .lean();
-  if (!(await GroupTicketCategory.exists({ _id: integration.category }))) {
+  const allCategories = await GroupTicketCategory.find()
+    .select('name slug image logo isSyncImported createdAt')
+    .lean();
+  const integrationCreatedAt = new Date(integration.createdAt).getTime();
+  const firstTicketCreatedAtByCategory = new Map();
+  for (const ticket of existing) {
+    const categoryId = String(ticket.category || '');
+    const ticketCreatedAt = new Date(ticket.createdAt).getTime();
+    const firstCreatedAt = firstTicketCreatedAtByCategory.get(categoryId);
+    if (!firstCreatedAt || ticketCreatedAt < firstCreatedAt) {
+      firstTicketCreatedAtByCategory.set(categoryId, ticketCreatedAt);
+    }
+  }
+  const sourceCategorySlugs = new Set(tickets.map((ticket) => ticket.sourceCategorySlug.toLowerCase()));
+  const legacyImportedCategoryIds = allCategories
+    .filter((category) => {
+      const createdAt = new Date(category.createdAt).getTime();
+      const isFromInitialSync = createdAt >= integrationCreatedAt
+        && createdAt - integrationCreatedAt <= initialCategorySyncWindowMs;
+      const firstTicketCreatedAt = firstTicketCreatedAtByCategory.get(String(category._id));
+      const wasCreatedAfterImportedTickets = firstTicketCreatedAt && createdAt > firstTicketCreatedAt;
+      return sourceCategorySlugs.has(category.slug.toLowerCase())
+        && (isFromInitialSync || wasCreatedAfterImportedTickets)
+        && String(category._id) !== String(integration.category || '')
+        && existing.some((ticket) => String(ticket.category) === String(category._id));
+    })
+    .map((category) => category._id);
+  if (legacyImportedCategoryIds.length) {
+    await GroupTicketCategory.updateMany(
+      { _id: { $in: legacyImportedCategoryIds } },
+      { $set: { isSyncImported: true } }
+    );
+  }
+  const importedCategoryIds = new Set(legacyImportedCategoryIds.map(String));
+  const categories = allCategories.filter(
+    (category) => !category.isSyncImported && !importedCategoryIds.has(String(category._id))
+  );
+  const fallbackCategory = integration.category
+    ? categories.find((category) => String(category._id) === String(integration.category))
+    : null;
+  if (integration.category && !fallbackCategory) {
     throw new Error('The local ticket category for this connection no longer exists.');
   }
   const existingBySourceId = new Map(existing.map((ticket) => [ticket.sourceTicketId, ticket]));
-  const categories = await GroupTicketCategory.find().select('name slug').lean();
   const categoryIdsBySlug = new Map(categories.map((category) => [category.slug.toLowerCase(), category._id]));
   const categoryWordSets = categories.map((category) => ({
     _id: category._id,
     words: new Set(categoryWords(`${category.slug} ${category.name}`)),
   }));
-  const matchCategory = (slug) => {
-    if (categoryIdsBySlug.has(slug)) return categoryIdsBySlug.get(slug);
-    const words = categoryWords(slug);
-    const matches = categoryWordSets.filter((category) => words.some((word) => category.words.has(word)));
-    return matches.length === 1 ? matches[0]._id : integration.category;
-  };
+  const categoryIdsBySourceSlug = new Map();
+  for (const ticket of tickets) {
+    const slug = ticket.sourceCategorySlug.toLowerCase();
+    if (categoryIdsBySourceSlug.has(slug)) continue;
+    let categoryId = categoryIdsBySlug.get(slug);
+    if (!categoryId) {
+      const words = categoryWords(`${slug} ${ticket.sourceCategoryName || ''}`);
+      const matches = categoryWordSets.filter((category) => words.some((word) => category.words.has(word)));
+      if (matches.length === 1) categoryId = matches[0]._id;
+    }
+    if (!categoryId) categoryId = fallbackCategory?._id;
+    if (!categoryId && categories.length === 1) categoryId = categories[0]._id;
+    if (!categoryId) {
+      throw new Error('A source category has no matching admin category. Add a matching category or select a local fallback category.');
+    }
+    const localCategory = categories.find((category) => String(category._id) === String(categoryId));
+    const sourceImage = ticket.sourceCategoryImage || ticket.sourceCategoryLogo || '';
+    if (sourceImage && localCategory && !localCategory.image && !localCategory.logo) {
+      await GroupTicketCategory.updateOne(
+        { _id: categoryId, image: '', logo: '' },
+        { $set: { image: sourceImage } }
+      );
+      localCategory.image = sourceImage;
+    }
+    categoryIdsBySourceSlug.set(slug, categoryId);
+  }
   const airlines = await Airline.find().select('name').lean();
   const airlineIds = new Map(airlines.map((airline) => [airline.name.trim().toLowerCase(), airline._id]));
   const receivedIds = new Set(tickets.map((ticket) => ticket.sourceId));
@@ -78,7 +138,7 @@ const applySourceTickets = async (integration, tickets) => {
     const set = {
       sourceIntegration: integration._id,
       sourceTicketId: ticket.sourceId,
-      category: matchCategory(ticket.sourceCategorySlug.toLowerCase()),
+      category: categoryIdsBySourceSlug.get(ticket.sourceCategorySlug.toLowerCase()),
       airline: ticket.airline,
       airlineLogo: ticket.airlineLogo,
       ...(airlineId ? { airlineId } : {}),
@@ -248,7 +308,10 @@ export const exportGroupTickets = async (req, res) => {
       return res.status(403).json({ success: false, message: 'This email does not have ticket access.' });
     }
 
-    const categories = await GroupTicketCategory.find().select('name slug').sort({ name: 1 }).lean();
+    const categories = await GroupTicketCategory.find({ isSyncImported: { $ne: true } })
+      .select('name slug image logo')
+      .sort({ name: 1 })
+      .lean();
     const categoriesOnly = req.query.categoriesOnly === 'true';
     const filter = categoriesOnly ? null : {
       isActive: true,
@@ -264,16 +327,21 @@ export const exportGroupTickets = async (req, res) => {
     const tickets = filter
       ? await GroupTicket.find(filter).select(
         'airline airlineLogo groupName departureDate segments baggage mealAvailable adultFare childFare infantFare infantPriceOnCall currency isAvailable'
-      ).populate('category', 'name slug').lean()
+      ).populate('category', 'name slug image logo').lean()
       : [];
     res.set('Cache-Control', 'no-store');
     res.json({
       success: true,
       complete: true,
-      categories: categories.map(({ name, slug }) => ({ name, slug })),
+      categories: categories.map(({ name, slug, image, logo }) => ({ name, slug, image, logo })),
       data: tickets.map((ticket) => ({
         sourceId: String(ticket._id),
-        category: ticket.category ? { name: ticket.category.name, slug: ticket.category.slug } : null,
+        category: ticket.category ? {
+          name: ticket.category.name,
+          slug: ticket.category.slug,
+          image: ticket.category.image,
+          logo: ticket.category.logo,
+        } : null,
         airline: ticket.airline,
         airlineLogo: ticket.airlineLogo,
         groupName: ticket.groupName,
@@ -329,8 +397,8 @@ export const createTicketIntegration = async (req, res) => {
     if (!accessEmail) {
       return res.status(400).json({ success: false, message: 'Enter the email that has ticket access on the source website.' });
     }
-    if (!mongoose.isValidObjectId(categoryId)
-      || !(await GroupTicketCategory.exists({ _id: categoryId }))) {
+    if (categoryId && (!mongoose.isValidObjectId(categoryId)
+      || !(await GroupTicketCategory.exists({ _id: categoryId })))) {
       return res.status(400).json({ success: false, message: 'Select a valid local ticket category.' });
     }
     const password = String(req.body.password || '');
@@ -342,7 +410,7 @@ export const createTicketIntegration = async (req, res) => {
         name,
         baseUrl,
         accessEmail,
-        category: categoryId,
+        ...(categoryId ? { category: categoryId } : {}),
         provider: 'alhaider',
         sourceTokenEncrypted: encryptIntegrationKey(login.token),
         sourceTokenExpiresAt: login.expiresAt,
@@ -363,7 +431,7 @@ export const createTicketIntegration = async (req, res) => {
       name,
       baseUrl,
       accessEmail,
-      category: categoryId,
+      ...(categoryId ? { category: categoryId } : {}),
       sourceCategorySlug,
     });
     const result = await applySourceTickets(integration, source.tickets);
@@ -400,11 +468,14 @@ export const updateTicketIntegration = async (req, res) => {
       integration.baseUrl = baseUrl;
     }
     if (req.body.category !== undefined) {
-      if (!mongoose.isValidObjectId(req.body.category)
+      if (!req.body.category) {
+        integration.category = undefined;
+      } else if (!mongoose.isValidObjectId(req.body.category)
         || !(await GroupTicketCategory.exists({ _id: req.body.category }))) {
         return res.status(400).json({ success: false, message: 'Select a valid local ticket category.' });
+      } else {
+        integration.category = req.body.category;
       }
-      integration.category = req.body.category;
     }
     if (req.body.sourceCategorySlug !== undefined) {
       const sourceCategorySlug = String(req.body.sourceCategorySlug || '').trim().toLowerCase();

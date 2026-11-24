@@ -18,12 +18,13 @@ function toDateInput(value) {
 }
 
 export default function GroupTicketForm({ initial, categories, airlines, saving, error, onSubmit, onClose }) {
+  const isSyncedTicket = Boolean(initial?.sourceIntegration);
   const existingAirlineId = initial?.airlineId?._id || initial?.airlineId || airlines.find((airline) => airline.name === initial?.airline)?._id || "";
   const [form, setForm] = useState({
     category: initial?.category?._id || initial?.category || categories[0]?._id || "",
     airlineId: existingAirlineId,
-    airline: initial?.airlineId?.name || initial?.airline || "",
-    airlineLogo: initial?.airlineId?.logo || initial?.airlineLogo || "",
+    airline: isSyncedTicket ? initial?.airline || initial?.airlineId?.name || "" : initial?.airlineId?.name || initial?.airline || "",
+    airlineLogo: isSyncedTicket ? initial?.airlineLogo || initial?.airlineId?.logo || "" : initial?.airlineId?.logo || initial?.airlineLogo || "",
     groupName: initial?.groupName || "",
     departureDate: toDateInput(initial?.departureDate),
     segments: initial?.segments?.length ? initial.segments.map((segment) => ({ ...segment })) : [{ ...emptySegment }],
@@ -61,7 +62,7 @@ export default function GroupTicketForm({ initial, categories, airlines, saving,
 
   const handleSubmit = (event) => {
     event.preventDefault();
-    onSubmit({
+    const body = {
       ...form,
       adultFare: Number(form.adultFare),
       childFare: Number(form.childFare || 0),
@@ -73,7 +74,13 @@ export default function GroupTicketForm({ initial, categories, airlines, saving,
         to: segment.to.trim(),
         flightNumber: segment.flightNumber.trim(),
       })),
-    });
+    };
+    if (isSyncedTicket) {
+      delete body.airlineId;
+      delete body.airline;
+      delete body.airlineLogo;
+    }
+    onSubmit(body);
   };
 
   return (
@@ -92,8 +99,8 @@ export default function GroupTicketForm({ initial, categories, airlines, saving,
             </select>
           </Field>
           <Field label="Airline">
-            <select name="airlineId" value={form.airlineId} onChange={setValue} required={!initial?.sourceIntegration} className={`dropdown-select ${inputClass}`}>
-              <option value="">Select airline</option>
+            <select name="airlineId" value={isSyncedTicket ? "__source_airline__" : form.airlineId} onChange={setValue} required={!isSyncedTicket} disabled={isSyncedTicket} className={`dropdown-select ${inputClass} disabled:cursor-not-allowed disabled:bg-slate-50`}>
+              {isSyncedTicket ? <option value="__source_airline__">{form.airline || "Source airline"}</option> : <option value="">Select airline</option>}
               {airlines.map((airline) => <option key={airline._id} value={airline._id}>{airline.name}</option>)}
             </select>
           </Field>
@@ -142,7 +149,7 @@ export default function GroupTicketForm({ initial, categories, airlines, saving,
         {error && <p className="mt-4 rounded-xl bg-red-50 px-4 py-2.5 text-sm text-red-600">{error}</p>}
         <div className="mt-6 flex justify-end gap-3">
           <button type="button" onClick={onClose} className="rounded-xl px-5 py-2.5 text-sm font-medium text-[#003366] hover:bg-[#EDEEE9]">Cancel</button>
-          <button type="submit" disabled={saving || categories.length === 0 || airlines.length === 0} className="rounded-xl bg-[#FF6B35] px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60">{saving ? "Saving..." : initial ? "Update ticket" : "Create ticket"}</button>
+          <button type="submit" disabled={saving || (!isSyncedTicket && (categories.length === 0 || airlines.length === 0))} className="rounded-xl bg-[#FF6B35] px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60">{saving ? "Saving..." : initial ? "Update ticket" : "Create ticket"}</button>
         </div>
       </form>
     </div>

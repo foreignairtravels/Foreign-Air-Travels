@@ -11,7 +11,6 @@ const ticketIntegrationSchema = new mongoose.Schema(
     category: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'GroupTicketCategory',
-      required: true,
     },
     sourceCategorySlug: { type: String, default: '', trim: true, lowercase: true },
     isActive: { type: Boolean, default: true, index: true },
