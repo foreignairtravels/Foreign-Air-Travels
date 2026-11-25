@@ -7,6 +7,7 @@ import { expirePendingGroupBookings } from '../utils/groupBookingExpiry.js';
 const ticketFields = (body) => {
   const fields = {};
   [
+    'stock',
     'category',
     'airlineId',
     'airline',
@@ -32,7 +33,10 @@ export const getGroupTickets = async (req, res) => {
     await expirePendingGroupBookings();
     const { category } = req.query;
     const filter = {};
-    if (req.query.all !== 'true') filter.isAvailable = { $ne: false };
+    if (req.query.all !== 'true') {
+      filter.isAvailable = { $ne: false };
+      filter.$or = [{ stock: { $exists: false } }, { stock: { $gt: 0 } }];
+    }
 
     if (category) {
       let categoryItem;
@@ -49,7 +53,7 @@ export const getGroupTickets = async (req, res) => {
 
     const projection = req.query.all === 'true'
       ? '-reservedBooking'
-      : '-reservedBooking -sourceIntegration -sourceTicketId -sourceFares -priceOverrides -sourceAvailable';
+      : '-reservedBooking -stock -sourceIntegration -sourceTicketId -sourceFares -priceOverrides -sourceAvailable';
     const tickets = await GroupTicket.find(filter)
       .select(projection)
       .populate('category', 'name slug logo tagline')

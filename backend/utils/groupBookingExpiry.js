@@ -8,7 +8,7 @@ export const expirePendingGroupBookings = async () => {
     confirmedAt: { $exists: false },
     expiresAt: { $lte: now },
   })
-    .select('_id ticket')
+    .select('_id ticket stockReserved')
     .limit(200)
     .lean();
 
@@ -21,7 +21,7 @@ export const expirePendingGroupBookings = async () => {
         confirmedAt: { $exists: false },
         expiresAt: { $lte: now },
       },
-      { $set: { status: 'cancelled', autoCancelledAt: now } },
+      { $set: { status: 'cancelled', stockReserved: false, autoCancelledAt: now } },
       { new: true }
     )
       .select('_id ticket')
@@ -29,13 +29,17 @@ export const expirePendingGroupBookings = async () => {
 
     if (!expired) continue;
 
-    const ticket = await GroupTicket.findOne({ _id: expired.ticket, reservedBooking: expired._id });
-    if (ticket) {
-      ticket.isAvailable = ticket.sourceIntegration
-        ? ticket.sourceAvailable && ticket.isActive
-        : true;
-      ticket.reservedBooking = null;
-      await ticket.save();
+    if (booking.stockReserved) {
+      await GroupTicket.findByIdAndUpdate(expired.ticket, { $inc: { stock: 1 } });
+    } else {
+      const ticket = await GroupTicket.findOne({ _id: expired.ticket, reservedBooking: expired._id });
+      if (ticket) {
+        ticket.isAvailable = ticket.sourceIntegration
+          ? ticket.sourceAvailable && ticket.isActive
+          : true;
+        ticket.reservedBooking = null;
+        await ticket.save();
+      }
     }
     expiredCount += 1;
   }

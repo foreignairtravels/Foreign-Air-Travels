@@ -35,6 +35,7 @@ export default function GroupTicketForm({ initial, categories, airlines, saving,
     infantFare: initial?.infantFare ?? "",
     infantPriceOnCall: initial?.infantPriceOnCall ?? false,
     currency: initial?.currency || "SAR",
+    stock: initial?.stock ?? 1,
   });
 
   const setValue = (event) => {
@@ -67,6 +68,7 @@ export default function GroupTicketForm({ initial, categories, airlines, saving,
       adultFare: Number(form.adultFare),
       childFare: Number(form.childFare || 0),
       infantFare: Number(form.infantFare || 0),
+      stock: Number(form.stock),
       currency: form.currency.trim().toUpperCase(),
       segments: form.segments.map((segment) => ({
         ...segment,
@@ -138,6 +140,7 @@ export default function GroupTicketForm({ initial, categories, airlines, saving,
           <Field label="Baggage"><input name="baggage" value={form.baggage} onChange={setValue} required className={inputClass} placeholder="23+23+7 KG" /></Field>
           <Field label="Currency"><input name="currency" value={form.currency} onChange={setValue} required maxLength={3} className={inputClass} placeholder="SAR" /></Field>
           <Field label="Adult fare"><input name="adultFare" type="number" min="0" step="0.01" value={form.adultFare} onChange={setValue} required className={inputClass} /></Field>
+          <Field label="Available stock"><input name="stock" type="number" min="0" step="1" value={form.stock} onChange={setValue} required className={inputClass} /></Field>
           <Field label="Child fare"><input name="childFare" type="number" min="0" step="0.01" value={form.childFare} onChange={setValue} className={inputClass} /></Field>
           <Field label="Price"><input name="infantFare" type="number" min="0" step="0.01" value={form.infantFare} onChange={setValue} disabled={form.infantPriceOnCall} className={inputClass} /></Field>
           <div className="flex flex-wrap gap-x-6 gap-y-3 sm:col-span-2">

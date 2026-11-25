@@ -36,6 +36,7 @@ const groupTicketSchema = new mongoose.Schema(
     infantFare: { type: Number, default: 0, min: 0 },
     infantPriceOnCall: { type: Boolean, default: false },
     currency: { type: String, default: 'SAR', trim: true, uppercase: true },
+    stock: { type: Number, min: 0, validate: Number.isInteger },
     bookingUrl: { type: String, default: '', trim: true },
     sourceIntegration: {
       type: mongoose.Schema.Types.ObjectId,

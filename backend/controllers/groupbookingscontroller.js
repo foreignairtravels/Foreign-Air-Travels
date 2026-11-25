@@ -40,6 +40,7 @@ export const createGroupBooking = async (req, res) => {
   let reservedTicketId;
   let bookingId;
   let bookingCreated = false;
+  let stockReserved = false;
   try {
     await expirePendingGroupBookings();
     const bookingData = req.body.booking ? JSON.parse(req.body.booking) : req.body;
@@ -99,21 +100,25 @@ export const createGroupBooking = async (req, res) => {
     }
 
     bookingId = new mongoose.Types.ObjectId();
-    const reservedTicket = await GroupTicket.findOneAndUpdate(
-      { _id: ticketId, isActive: true, isAvailable: { $ne: false } },
-      {
-        $set: {
-          isAvailable: false,
-          reservedBooking: bookingId,
-        },
-      },
+    let reservedTicket = await GroupTicket.findOneAndUpdate(
+      { _id: ticketId, isActive: true, isAvailable: { $ne: false }, stock: { $gt: 0 } },
+      { $inc: { stock: -1 } },
       { new: true }
     );
+    if (reservedTicket) {
+      stockReserved = true;
+    } else {
+      reservedTicket = await GroupTicket.findOneAndUpdate(
+        { _id: ticketId, isActive: true, isAvailable: { $ne: false }, stock: { $exists: false } },
+        { $set: { isAvailable: false, reservedBooking: bookingId } },
+        { new: true }
+      );
+    }
     if (!reservedTicket) {
       const exists = await GroupTicket.exists({ _id: ticketId, isActive: true });
       return res.status(exists ? 409 : 404).json({
         success: false,
-        message: exists ? 'This ticket has already been booked.' : 'Group ticket not found.',
+        message: exists ? 'This ticket is no longer available.' : 'Group ticket not found.',
       });
     }
     reservedTicketId = reservedTicket._id;
@@ -144,6 +149,7 @@ export const createGroupBooking = async (req, res) => {
       contactPhone: String(contactPhone).trim(),
       totalPrice,
       infantPriceOnCall,
+      stockReserved,
       expiresAt,
     });
     bookingCreated = true;
@@ -157,16 +163,20 @@ export const createGroupBooking = async (req, res) => {
     });
   } catch (error) {
     if (reservedTicketId && bookingId && !bookingCreated) {
-      const reservedTicket = await GroupTicket.findOne({
-        _id: reservedTicketId,
-        reservedBooking: bookingId,
-      });
-      if (reservedTicket) {
-        reservedTicket.isAvailable = reservedTicket.sourceIntegration
-          ? reservedTicket.sourceAvailable && reservedTicket.isActive
-          : true;
-        reservedTicket.reservedBooking = null;
-        await reservedTicket.save();
+      if (stockReserved) {
+        await GroupTicket.findByIdAndUpdate(reservedTicketId, { $inc: { stock: 1 } });
+      } else {
+        const reservedTicket = await GroupTicket.findOne({
+          _id: reservedTicketId,
+          reservedBooking: bookingId,
+        });
+        if (reservedTicket) {
+          reservedTicket.isAvailable = reservedTicket.sourceIntegration
+            ? reservedTicket.sourceAvailable && reservedTicket.isActive
+            : true;
+          reservedTicket.reservedBooking = null;
+          await reservedTicket.save();
+        }
       }
     }
     res.status(400).json({ success: false, message: error.message });
@@ -252,6 +262,9 @@ export const updateAdminGroupBookingStatus = async (req, res) => {
       return res.status(409).json({ success: false, message: 'The 2-hour booking hold has expired.' });
     }
 
+    const shouldRestoreStock = status === 'cancelled'
+      && currentBooking.status !== 'cancelled'
+      && currentBooking.stockReserved;
     const booking = await GroupBooking.findOneAndUpdate(
       {
         _id: id,
@@ -264,6 +277,7 @@ export const updateAdminGroupBookingStatus = async (req, res) => {
       {
         $set: {
           status,
+          ...(status === 'cancelled' ? { stockReserved: false } : {}),
           ...(status === 'confirmed' && !currentBooking.confirmedAt ? { confirmedAt: new Date() } : {}),
         },
       },
@@ -273,7 +287,9 @@ export const updateAdminGroupBookingStatus = async (req, res) => {
       await expirePendingGroupBookings();
       return res.status(409).json({ success: false, message: 'This booking status changed. Refresh and try again.' });
     }
-    if (status === 'cancelled') {
+    if (shouldRestoreStock) {
+      await GroupTicket.findByIdAndUpdate(booking.ticket, { $inc: { stock: 1 } });
+    } else if (status === 'cancelled' && currentBooking.status !== 'cancelled') {
       const reservedTicket = await GroupTicket.findOne({
         _id: booking.ticket,
         reservedBooking: booking._id,

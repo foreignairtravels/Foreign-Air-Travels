@@ -51,6 +51,7 @@ const groupBookingSchema = new mongoose.Schema(
     contactPhone: { type: String, required: true, trim: true },
     totalPrice: { type: Number, required: true, min: 0 },
     infantPriceOnCall: { type: Boolean, default: false },
+    stockReserved: { type: Boolean, default: false },
     status: {
       type: String,
       enum: ['pending', 'processing', 'on_hold', 'confirmed', 'cancelled', 'completed'],
