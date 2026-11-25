@@ -53,7 +53,7 @@ export const getGroupTickets = async (req, res) => {
 
     const projection = req.query.all === 'true'
       ? '-reservedBooking'
-      : '-reservedBooking -stock -sourceIntegration -sourceTicketId -sourceFares -priceOverrides -sourceAvailable';
+      : '-reservedBooking -sourceIntegration -sourceTicketId -sourceFares -priceOverrides -sourceAvailable';
     const tickets = await GroupTicket.find(filter)
       .select(projection)
       .populate('category', 'name slug logo tagline')

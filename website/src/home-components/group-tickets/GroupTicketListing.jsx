@@ -153,6 +153,7 @@ function TicketGroupCard({ tickets, selectedTicketId, onBook }) {
               <div className="flex min-w-0 flex-col justify-center bg-white px-4 py-3 sm:px-5 xl:items-center xl:text-center">
                 <p className="mb-1 text-xs font-bold uppercase tracking-[0.12em] text-slate-600 xl:hidden">Bag</p>
                 <p className="break-words text-base font-bold text-[#003366]">{ticket.baggage}</p>
+                {ticket.stock !== undefined && <p className="mt-1 text-xs font-semibold text-slate-600">Stock: {ticket.stock}</p>}
               </div>
               <div className="flex min-w-0 flex-col justify-center bg-white px-4 py-3 sm:px-5 xl:items-center xl:text-center">
                 <p className="mb-1 text-xs font-bold uppercase tracking-[0.12em] text-slate-600 xl:hidden">Meal</p>

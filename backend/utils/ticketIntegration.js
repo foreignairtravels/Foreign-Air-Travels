@@ -159,6 +159,15 @@ export const normalizeIntegrationPayload = (payload, selectedCategorySlug = '') 
     ) {
       throw new Error(`Source ticket ${sourceId} has an invalid availability or meal flag.`);
     }
+    const stockValue = typeof ticket.stock === 'string'
+      ? ticket.stock.replace(/,/g, '').trim()
+      : ticket.stock;
+    const stock = stockValue === undefined || stockValue === null || stockValue === ''
+      ? undefined
+      : Number(stockValue);
+    if (stock !== undefined && (!Number.isInteger(stock) || stock < 0)) {
+      throw new Error(`Source ticket ${sourceId} has an invalid stock value.`);
+    }
     const currency = text(ticket.currency || 'SAR', 'currency', 3).toUpperCase();
     return {
       sourceId,
@@ -172,6 +181,7 @@ export const normalizeIntegrationPayload = (payload, selectedCategorySlug = '') 
       departureDate,
       segments,
       baggage: text(ticket.baggage, 'baggage', 200),
+      ...(stock !== undefined ? { stock } : {}),
       mealAvailable: Boolean(ticket.mealAvailable),
       infantPriceOnCall: Boolean(ticket.infantPriceOnCall),
       currency,
@@ -282,6 +292,16 @@ export const fetchIntegrationTickets = async (
 const sourceMessage = (status, data) => String(data?.message || `HTTP ${status || 'error'}`).replace(/\.+$/, '').slice(0, 200);
 const sourceNumber = (value) => Number(String(value ?? '').replace(/,/g, '').trim());
 const sourceTime = (value) => String(value || '').trim().replace(/^(\d{1,2}:\d{2}):\d{2}$/, '$1');
+const sourceBaggageText = (value) => {
+  if (Array.isArray(value)) return value.map(sourceBaggageText).filter(Boolean).join(', ');
+  if (value && typeof value === 'object') {
+    return Object.entries(value)
+      .map(([label, item]) => `${label}: ${sourceBaggageText(item)}`)
+      .filter((item) => !item.endsWith(': '))
+      .join(', ');
+  }
+  return String(value ?? '').trim();
+};
 const sourceAirlineName = (airline) => String(airline?.airline_name || '')
   .trim()
   .replace(/^\d+\.\s*/, '')
@@ -340,7 +360,26 @@ export const fetchAlHaiderTickets = async (baseUrl, token, selectedCategorySlug 
     const type = String(group.type || '').trim().slice(0, 120);
     const categorySlug = type.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
     if (categorySlug && !categories.has(categorySlug)) categories.set(categorySlug, { slug: categorySlug, name: type });
-    const baggage = String(group.baggage || '').trim().slice(0, 190);
+    const baggageValues = [group, ...details]
+      .flatMap((record) => Object.entries(record)
+        .filter(([field, value]) => /baggage|luggage|bag/i.test(field)
+          && value !== undefined && value !== null && value !== false)
+        .map(([, value]) => sourceBaggageText(value)))
+      .filter(Boolean);
+    const baggage = [...new Set(baggageValues)].join(', ');
+    if (!baggage) {
+      throw new Error(`Source ticket ${group.id} is missing baggage details.`);
+    }
+    const sourceStock = Object.entries(group).find(([field, value]) => {
+      const normalizedField = field.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const isStockField = normalizedField.includes('stock')
+        || /^(?:(?:available|remaining|left|total)?seats?(?:available|remaining|left|total)?|numberofseats|noofseats|seatcount|seatscount|availableseatcount|remainingseatcount|totalseatcount|qty|quantity|availableqty|availablequantity|remainingqty|remainingquantity)$/.test(normalizedField);
+      return isStockField
+        && value !== undefined
+        && value !== null
+        && typeof value !== 'boolean'
+        && String(value).trim() !== '';
+    })?.[1];
     data.push({
       sourceId: String(group.id),
       categorySlug,
@@ -356,7 +395,8 @@ export const fetchAlHaiderTickets = async (baseUrl, token, selectedCategorySlug 
           .filter(Boolean).join(' '),
         arrivalTime: sourceTime(detail.arv_time),
       })),
-      baggage: !baggage ? 'N/A' : /[a-z]/i.test(baggage) ? baggage : `${baggage} KG`,
+      baggage: /[a-z]/i.test(baggage) ? baggage : `${baggage} KG`,
+      ...(sourceStock !== undefined ? { stock: sourceStock } : {}),
       mealAvailable: /^y/i.test(String(group.meal || '').trim()),
       adultFare: price,
       childFare: price,

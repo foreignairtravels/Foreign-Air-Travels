@@ -206,7 +206,7 @@ function createBookingPdf(
   const money = (value) =>
     `${pdfText(details.currency || "SAR")} ${Number(value || 0).toLocaleString("en-US")}`;
   const colors = {
-    blue: [0, 139, 190],
+    blue: [18, 48, 100],
     navy: [18, 48, 100],
     orange: [255, 107, 53],
     paleBlue: [232, 247, 252],
@@ -380,7 +380,7 @@ function createBookingPdf(
   doc.setLineWidth(0.25);
   doc.line(margin, 30, pageWidth - margin, 30);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(20);
+  doc.setFontSize(22);
   setColor("navy");
   doc.text("Electronic Ticket Reservation", margin, 38);
   const groupName = splitCellLines(
@@ -420,7 +420,7 @@ function createBookingPdf(
   doc.setLineWidth(0.45);
   doc.roundedRect(margin, y, contentWidth, metadataHeight, 1.5, 1.5, "S");
   doc.setFillColor(...colors.navy);
-  doc.roundedRect(margin, y, contentWidth, 3, 1.5, 1.5, "F");
+  doc.roundedRect(margin, y, contentWidth, 1.5, 0.75, 0.75, "F");
   doc.setFillColor(...colors.white);
   doc.rect(margin + 0.25, y + 1.5, contentWidth - 0.5, 1.5, "F");
   doc.setDrawColor(...colors.border);

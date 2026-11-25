@@ -155,16 +155,21 @@ const applySourceTickets = async (integration, tickets) => {
       sourceAvailable: ticket.sourceAvailable,
       isActive: true,
       isAvailable: ticket.sourceAvailable && !previous?.reservedBooking,
+      ...(ticket.stock !== undefined ? { stock: ticket.stock } : {}),
       ...effectiveFares,
       currency: previous?.currencyOverride ? previous.currency : ticket.currency,
       ...Object.fromEntries(fareFields.map((field) => [`priceOverrides.${field}`, Boolean(priceOverrides[field])])),
+    };
+    const unset = {
+      ...(!airlineId ? { airlineId: 1 } : {}),
+      ...(ticket.stock === undefined ? { stock: 1 } : {}),
     };
     return {
       updateOne: {
         filter: { sourceIntegration: integration._id, sourceTicketId: ticket.sourceId },
         update: {
           $set: set,
-          ...(!airlineId ? { $unset: { airlineId: 1 } } : {}),
+          ...(Object.keys(unset).length ? { $unset: unset } : {}),
         },
         upsert: true,
       },
@@ -326,7 +331,7 @@ export const exportGroupTickets = async (req, res) => {
     }
     const tickets = filter
       ? await GroupTicket.find(filter).select(
-        'airline airlineLogo groupName departureDate segments baggage mealAvailable adultFare childFare infantFare infantPriceOnCall currency isAvailable'
+        'airline airlineLogo groupName departureDate segments baggage stock mealAvailable adultFare childFare infantFare infantPriceOnCall currency isAvailable'
       ).populate('category', 'name slug image logo').lean()
       : [];
     res.set('Cache-Control', 'no-store');
@@ -348,6 +353,7 @@ export const exportGroupTickets = async (req, res) => {
         departureDate: ticket.departureDate,
         segments: ticket.segments,
         baggage: ticket.baggage,
+        ...(ticket.stock !== undefined ? { stock: ticket.stock } : {}),
         mealAvailable: ticket.mealAvailable,
         adultFare: ticket.adultFare,
         childFare: ticket.childFare,
