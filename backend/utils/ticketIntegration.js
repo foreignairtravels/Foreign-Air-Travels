@@ -367,19 +367,10 @@ export const fetchAlHaiderTickets = async (baseUrl, token, selectedCategorySlug 
         .map(([, value]) => sourceBaggageText(value)))
       .filter(Boolean);
     const baggage = [...new Set(baggageValues)].join(', ');
-    if (!baggage) {
-      throw new Error(`Source ticket ${group.id} is missing baggage details.`);
-    }
-    const sourceStock = Object.entries(group).find(([field, value]) => {
-      const normalizedField = field.toLowerCase().replace(/[^a-z0-9]/g, '');
-      const isStockField = normalizedField.includes('stock')
-        || /^(?:(?:available|remaining|left|total)?seats?(?:available|remaining|left|total)?|numberofseats|noofseats|seatcount|seatscount|availableseatcount|remainingseatcount|totalseatcount|qty|quantity|availableqty|availablequantity|remainingqty|remainingquantity)$/.test(normalizedField);
-      return isStockField
-        && value !== undefined
-        && value !== null
-        && typeof value !== 'boolean'
-        && String(value).trim() !== '';
-    })?.[1];
+    // Seats still open for booking (same value as /api/available/seats/{id}).
+    const availableSeats = String(group.available_no_of_pax ?? '').trim()
+      ? sourceNumber(group.available_no_of_pax)
+      : NaN;
     data.push({
       sourceId: String(group.id),
       categorySlug,
@@ -395,8 +386,8 @@ export const fetchAlHaiderTickets = async (baseUrl, token, selectedCategorySlug 
           .filter(Boolean).join(' '),
         arrivalTime: sourceTime(detail.arv_time),
       })),
-      baggage: /[a-z]/i.test(baggage) ? baggage : `${baggage} KG`,
-      ...(sourceStock !== undefined ? { stock: sourceStock } : {}),
+      baggage: !baggage ? 'N/A' : /[a-z]/i.test(baggage) ? baggage : `${baggage} KG`,
+      ...(Number.isInteger(availableSeats) ? { stock: Math.max(availableSeats, 0) } : {}),
       mealAvailable: /^y/i.test(String(group.meal || '').trim()),
       adultFare: price,
       childFare: price,

@@ -15,7 +15,6 @@ import {
 
 const syncIntervalMs = 15 * 60 * 1000;
 const syncLockMs = 2 * 60 * 1000;
-const initialCategorySyncWindowMs = 30 * 1000;
 const fareFields = ['adultFare', 'childFare', 'infantFare'];
 const normalizeEmail = (value) => {
   const email = String(value ?? '').trim().toLowerCase();
@@ -47,45 +46,11 @@ const safeIntegration = (integration) => ({
 
 const applySourceTickets = async (integration, tickets) => {
   const existing = await GroupTicket.find({ sourceIntegration: integration._id })
-    .select('sourceTicketId category createdAt reservedBooking airlineId adultFare childFare infantFare priceOverrides currency currencyOverride')
+    .select('sourceTicketId reservedBooking airlineId adultFare childFare infantFare priceOverrides currency currencyOverride')
     .lean();
-  const allCategories = await GroupTicketCategory.find()
-    .select('name slug image logo isSyncImported createdAt')
+  const categories = await GroupTicketCategory.find({ isSyncImported: { $ne: true } })
+    .select('name slug image logo')
     .lean();
-  const integrationCreatedAt = new Date(integration.createdAt).getTime();
-  const firstTicketCreatedAtByCategory = new Map();
-  for (const ticket of existing) {
-    const categoryId = String(ticket.category || '');
-    const ticketCreatedAt = new Date(ticket.createdAt).getTime();
-    const firstCreatedAt = firstTicketCreatedAtByCategory.get(categoryId);
-    if (!firstCreatedAt || ticketCreatedAt < firstCreatedAt) {
-      firstTicketCreatedAtByCategory.set(categoryId, ticketCreatedAt);
-    }
-  }
-  const sourceCategorySlugs = new Set(tickets.map((ticket) => ticket.sourceCategorySlug.toLowerCase()));
-  const legacyImportedCategoryIds = allCategories
-    .filter((category) => {
-      const createdAt = new Date(category.createdAt).getTime();
-      const isFromInitialSync = createdAt >= integrationCreatedAt
-        && createdAt - integrationCreatedAt <= initialCategorySyncWindowMs;
-      const firstTicketCreatedAt = firstTicketCreatedAtByCategory.get(String(category._id));
-      const wasCreatedAfterImportedTickets = firstTicketCreatedAt && createdAt > firstTicketCreatedAt;
-      return sourceCategorySlugs.has(category.slug.toLowerCase())
-        && (isFromInitialSync || wasCreatedAfterImportedTickets)
-        && String(category._id) !== String(integration.category || '')
-        && existing.some((ticket) => String(ticket.category) === String(category._id));
-    })
-    .map((category) => category._id);
-  if (legacyImportedCategoryIds.length) {
-    await GroupTicketCategory.updateMany(
-      { _id: { $in: legacyImportedCategoryIds } },
-      { $set: { isSyncImported: true } }
-    );
-  }
-  const importedCategoryIds = new Set(legacyImportedCategoryIds.map(String));
-  const categories = allCategories.filter(
-    (category) => !category.isSyncImported && !importedCategoryIds.has(String(category._id))
-  );
   const fallbackCategory = integration.category
     ? categories.find((category) => String(category._id) === String(integration.category))
     : null;
@@ -102,13 +67,30 @@ const applySourceTickets = async (integration, tickets) => {
   for (const ticket of tickets) {
     const slug = ticket.sourceCategorySlug.toLowerCase();
     if (categoryIdsBySourceSlug.has(slug)) continue;
-    let categoryId = categoryIdsBySlug.get(slug);
-    if (!categoryId) {
+    const localSlug = slug.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    let categoryId = categoryIdsBySlug.get(localSlug);
+    if (!categoryId && fallbackCategory) {
       const words = categoryWords(`${slug} ${ticket.sourceCategoryName || ''}`);
       const matches = categoryWordSets.filter((category) => words.some((word) => category.words.has(word)));
       if (matches.length === 1) categoryId = matches[0]._id;
     }
     if (!categoryId) categoryId = fallbackCategory?._id;
+    if (!categoryId && localSlug) {
+      // "All categories": bring the source category itself; later syncs find it by its slug.
+      const sourceCategory = await GroupTicketCategory.findOneAndUpdate(
+        { slug: localSlug },
+        {
+          $setOnInsert: {
+            name: ticket.sourceCategoryName || localSlug,
+            image: ticket.sourceCategoryImage,
+            logo: ticket.sourceCategoryLogo,
+          },
+          $set: { isSyncImported: false },
+        },
+        { upsert: true, returnDocument: 'after' }
+      ).lean();
+      categoryId = sourceCategory._id;
+    }
     if (!categoryId && categories.length === 1) categoryId = categories[0]._id;
     if (!categoryId) {
       throw new Error('A source category has no matching admin category. Add a matching category or select a local fallback category.');
@@ -183,7 +165,7 @@ const applySourceTickets = async (integration, tickets) => {
   if (missingIds.length) {
     await GroupTicket.updateMany(
       { _id: { $in: missingIds } },
-      { $set: { isActive: false, isAvailable: false, sourceAvailable: false } }
+      { $set: { isActive: false, isAvailable: false, sourceAvailable: false, stock: 0 } }
     );
   }
   return { imported: tickets.length, removed: missingIds.length };

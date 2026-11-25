@@ -21,12 +21,15 @@ const formatDate = (value) => {
 const fare = (currency, value) =>
   `${currency} ${Number(value || 0).toLocaleString('en-US')}`
 
+const getRouteName = (ticket) => ticket.groupName?.split(' · ')[0]?.trim()
+  || `${ticket.segments[0]?.from || ''}-${ticket.segments[ticket.segments.length - 1]?.to || ''}`
+
 const getTicketGroupKey = (ticket) => {
   const airlineId = typeof ticket.airlineId === 'object' ? ticket.airlineId?._id : ticket.airlineId
   const categoryId = typeof ticket.category === 'object' ? ticket.category?._id : ticket.category
   const airlineKey = airlineId || ticket.airline?.trim().toLowerCase() || 'unknown-airline'
   const categoryKey = categoryId || ticket.category?.slug || ticket.category?.name?.trim().toLowerCase() || 'unknown-category'
-  return `${airlineKey}:${categoryKey}`
+  return `${airlineKey}:${categoryKey}:${getRouteName(ticket).toLowerCase()}`
 }
 
 const filterControlClass =
@@ -62,8 +65,7 @@ function TicketGroupCard({ tickets, selectedTicketId, onBook }) {
   const firstTicket = tickets[0]
   const airlineName = firstTicket.airlineId?.name || firstTicket.airline
   const airlineLogo = firstTicket.airlineId?.logo || firstTicket.airlineLogo
-  const routeName = firstTicket.groupName?.split(' · ')[0]?.trim()
-    || `${firstTicket.segments[0]?.from || ''}-${firstTicket.segments[firstTicket.segments.length - 1]?.to || ''}`
+  const routeName = getRouteName(firstTicket)
   const tagline = firstTicket.category?.tagline?.trim()
   const columnLayout = 'xl:grid-cols-[minmax(100px,0.9fr)_minmax(100px,0.9fr)_minmax(145px,1.2fr)_minmax(120px,1fr)_minmax(80px,0.7fr)_minmax(75px,0.65fr)_minmax(140px,1.1fr)_minmax(120px,0.9fr)]'
 
@@ -153,7 +155,6 @@ function TicketGroupCard({ tickets, selectedTicketId, onBook }) {
               <div className="flex min-w-0 flex-col justify-center bg-white px-4 py-3 sm:px-5 xl:items-center xl:text-center">
                 <p className="mb-1 text-xs font-bold uppercase tracking-[0.12em] text-slate-600 xl:hidden">Bag</p>
                 <p className="break-words text-base font-bold text-[#003366]">{ticket.baggage}</p>
-                {ticket.stock !== undefined && <p className="mt-1 text-xs font-semibold text-slate-600">Stock: {ticket.stock}</p>}
               </div>
               <div className="flex min-w-0 flex-col justify-center bg-white px-4 py-3 sm:px-5 xl:items-center xl:text-center">
                 <p className="mb-1 text-xs font-bold uppercase tracking-[0.12em] text-slate-600 xl:hidden">Meal</p>
