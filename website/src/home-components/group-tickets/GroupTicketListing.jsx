@@ -62,6 +62,8 @@ function TicketGroupCard({ tickets, selectedTicketId, onBook }) {
   const firstTicket = tickets[0]
   const airlineName = firstTicket.airlineId?.name || firstTicket.airline
   const airlineLogo = firstTicket.airlineId?.logo || firstTicket.airlineLogo
+  const routeName = firstTicket.groupName?.split(' · ')[0]?.trim()
+    || `${firstTicket.segments[0]?.from || ''}-${firstTicket.segments[firstTicket.segments.length - 1]?.to || ''}`
   const tagline = firstTicket.category?.tagline?.trim()
   const columnLayout = 'xl:grid-cols-[minmax(100px,0.9fr)_minmax(100px,0.9fr)_minmax(145px,1.2fr)_minmax(120px,1fr)_minmax(80px,0.7fr)_minmax(75px,0.65fr)_minmax(140px,1.1fr)_minmax(120px,0.9fr)]'
 
@@ -79,7 +81,7 @@ function TicketGroupCard({ tickets, selectedTicketId, onBook }) {
             <FaPlane className="size-5 -rotate-45 sm:size-6" />
           </span>
           <div className="min-w-0">
-            <p className="whitespace-normal break-words text-sm font-semibold leading-5 text-[#003366] sm:text-lg">{airlineName}</p>
+            <p className="whitespace-normal break-words text-sm font-semibold leading-5 text-[#003366] sm:text-lg">{routeName}</p>
             {/* <p className="mt-1 whitespace-normal break-words text-[11px] font-semibold uppercase leading-4 tracking-[0.12em] text-[#FF6B35] sm:text-xs">
               {firstTicket.category?.name}
             </p> */}
@@ -197,7 +199,7 @@ export default function GroupTicketListing({ slug = '', dashboardMode = false, p
     setLoading(true)
     setError('')
     const [categoryResult, ticketResult, airlineResult] = await Promise.all([
-      getGroupTicketCategories(),
+      getGroupTicketCategories(true),
       getGroupTickets(categoryFilter || undefined),
       getAirlines(),
     ])
@@ -258,11 +260,26 @@ export default function GroupTicketListing({ slug = '', dashboardMode = false, p
   }
 
   const selectedCategory = categories.find((category) => category.slug === categoryFilter)
+  const airlineOptions = [...airlines]
+  const knownAirlineNames = new Set(airlines.map((airline) => airline.name.trim().toLowerCase()))
+  tickets.forEach((ticket) => {
+    const name = ticket.airlineId?.name || ticket.airline
+    const normalizedName = name?.trim().toLowerCase()
+    if (normalizedName && !knownAirlineNames.has(normalizedName)) {
+      airlineOptions.push({
+        _id: ticket.airlineId?._id || `source:${normalizedName}`,
+        name,
+      })
+      knownAirlineNames.add(normalizedName)
+    }
+  })
   const airlineFilteredTickets = selectedAirlineId
     ? tickets.filter((ticket) => {
       const ticketAirlineId = typeof ticket.airlineId === 'object' ? ticket.airlineId?._id : ticket.airlineId
-      const selectedAirline = airlines.find((airline) => airline._id === selectedAirlineId)
-      return ticketAirlineId === selectedAirlineId || (!ticketAirlineId && ticket.airline === selectedAirline?.name)
+      const selectedAirline = airlineOptions.find((airline) => airline._id === selectedAirlineId)
+      const ticketAirlineName = ticket.airlineId?.name || ticket.airline
+      return ticketAirlineId === selectedAirlineId
+        || ticketAirlineName?.trim().toLowerCase() === selectedAirline?.name.trim().toLowerCase()
     })
     : tickets
   const dateAndTimeFilteredTickets = airlineFilteredTickets.filter((ticket) => {
@@ -326,7 +343,7 @@ export default function GroupTicketListing({ slug = '', dashboardMode = false, p
             onChange={(event) => setSelectedAirlineId(event.target.value)}
           >
             <option value="">All airlines</option>
-            {airlines.map((airline) => (
+            {airlineOptions.map((airline) => (
               <option key={airline._id} value={airline._id}>{airline.name}</option>
             ))}
           </FilterSelect>

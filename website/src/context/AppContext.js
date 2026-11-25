@@ -224,7 +224,10 @@ export function AppProvider({ children }) {
   const getPackages = useCallback(() => request("/api/packages"), [request]);
 
   // ---------- GROUP TICKETS (public, token nahi chahiye) ----------
-  const getGroupTicketCategories = useCallback(() => request("/api/group-ticket-categories", { cache: "no-store" }), [request]);
+  const getGroupTicketCategories = useCallback(
+    (includeSynced = false) => request(`/api/group-ticket-categories${includeSynced ? "?all=true" : ""}`, { cache: "no-store" }),
+    [request]
+  );
   const getGroupTickets = useCallback(
     (category) => request(`/api/group-tickets${category ? `?category=${encodeURIComponent(category)}` : ""}`),
     [request]
