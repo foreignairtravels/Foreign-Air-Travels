@@ -169,7 +169,6 @@ async function getLogoDataUrl(logoUrl) {
 
 function createBookingPdf(
   booking,
-  invoiceLogo,
   airlineLogo,
   includePrice,
   user,
@@ -360,12 +359,12 @@ function createBookingPdf(
   const segments = details.segments || [];
   doc.setFillColor(255, 255, 255);
   doc.rect(0, 0, pageWidth, pageHeight, "F");
-  if (invoiceLogo) {
-    const scale = Math.min(48 / invoiceLogo.width, 22 / invoiceLogo.height);
-    const logoWidth = invoiceLogo.width * scale;
-    const logoHeight = invoiceLogo.height * scale;
+  if (airlineLogo) {
+    const scale = Math.min(48 / airlineLogo.width, 22 / airlineLogo.height);
+    const logoWidth = airlineLogo.width * scale;
+    const logoHeight = airlineLogo.height * scale;
     doc.addImage(
-      invoiceLogo.dataUrl,
+      airlineLogo.dataUrl,
       "PNG",
       pageWidth - margin - logoWidth,
       7 + (22 - logoHeight) / 2,
@@ -520,7 +519,7 @@ function createBookingPdf(
     doc.setFont("helvetica", "bold");
     doc.setFontSize(11);
     const routeLines = splitCellLines(routeLabel, contentWidth - 8, 11, "bold");
-    const routeBarHeight = Math.max(11, routeLines.length * 4.3 + 3);
+    const routeBarHeight = Math.max(9, routeLines.length * 4.3 + 3);
     if (y + routeBarHeight + 2 + 8 + rowHeight > bottomLimit) {
       drawFooter();
       doc.addPage();
@@ -543,7 +542,7 @@ function createBookingPdf(
     });
     y += routeBarHeight + 2;
     y = drawTableHeader(flightColumns, y);
-    y = drawTableRow(flightColumns, flightRow, y, index % 2 === 1, airlineLogo);
+    y = drawTableRow(flightColumns, flightRow, y, false, airlineLogo);
     y += 4;
   }
 
@@ -854,13 +853,9 @@ export default function BookingsPage() {
     previewWindow.document.close();
 
     try {
-      const [invoiceLogo, airlineLogo] = await Promise.all([
-        getLogoDataUrl(booking.invoiceLogo || "/FOREIGN-AIR-TRAVEL.png"),
-        getLogoDataUrl(booking.ticketDetails.airlineLogo),
-      ]);
+      const airlineLogo = await getLogoDataUrl(booking.ticketDetails.airlineLogo);
       const { blob, filename } = createBookingPdf(
         booking,
-        invoiceLogo,
         airlineLogo,
         includePrice,
         user,
