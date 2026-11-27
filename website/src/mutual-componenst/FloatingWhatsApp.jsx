@@ -13,7 +13,7 @@ const FloatingWhatsApp = () => {
 
   return (
     <a
-      href="https://wa.me/966596382847"
+      href="https://wa.me/923017075427"
       target="_blank"
       rel="noopener noreferrer"
       aria-label="Message us on WhatsApp"

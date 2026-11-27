@@ -18,10 +18,28 @@ import { useApp } from '@/context/AppContext'
 
 /* ------------------------------ CONFIG ------------------------------ */
 
-const WHATSAPP_NUMBER = '+966 59 638 2847'
-const WHATSAPP_HREF = 'https://wa.me/966596382847'
+const WHATSAPP_NUMBER = '0301 7075427'
+const WHATSAPP_HREF = 'https://wa.me/923017075427'
 const PHONE_NUMBER = '0301 7075427'
-const PHONE_HREF = 'tel:+9663017075427'
+const PHONE_HREF = 'tel:+923017075427'
+
+const MOBILE_CONTACT_NUMBERS = [
+    {
+        label: '0301 7075427',
+        href: 'https://wa.me/923017075427',
+        icon: 'whatsapp',
+    },
+    {
+        label: '0339 2923001',
+        href: 'tel:+923392923001',
+        icon: 'phone',
+    },
+    {
+        label: '+966 59 638 2847',
+        href: 'https://wa.me/966596382847',
+        icon: 'whatsapp',
+    },
+]
 
 /* ---------------------------- DESKTOP DROPDOWN ---------------------------- */
 
@@ -596,23 +614,23 @@ const Navbar = () => {
 
                         <div className="mycontainer space-y-4 pb-6 pt-3">
                             <ul className="space-y-3 rounded-2xl bg-slate-50 p-4 text-[14px] leading-[22px] text-slate-600">
-                                <li className="flex items-center gap-3">
-                                    <FaWhatsapp aria-hidden="true" className="size-[16px] shrink-0 text-[#FF6B35]" />
-                                    <a
-                                        href={WHATSAPP_HREF}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="font-medium text-slate-800"
-                                    >
-                                        {WHATSAPP_NUMBER}
-                                    </a>
-                                </li>
-                                <li className="flex items-center gap-3">
-                                    <FaPhoneAlt aria-hidden="true" className="size-[14px] shrink-0 text-[#FF6B35]" />
-                                    <a href={PHONE_HREF} className="font-medium text-slate-800">
-                                        {PHONE_NUMBER}
-                                    </a>
-                                </li>
+                                {MOBILE_CONTACT_NUMBERS.map(({ label, href, icon }) => (
+                                    <li key={label} className="flex items-center gap-3">
+                                        {icon === 'whatsapp' ? (
+                                            <FaWhatsapp aria-hidden="true" className="size-[16px] shrink-0 text-[#FF6B35]" />
+                                        ) : (
+                                            <FaPhoneAlt aria-hidden="true" className="size-[14px] shrink-0 text-[#FF6B35]" />
+                                        )}
+                                        <a
+                                            href={href}
+                                            target={icon === 'whatsapp' ? '_blank' : undefined}
+                                            rel={icon === 'whatsapp' ? 'noopener noreferrer' : undefined}
+                                            className="font-medium text-slate-800"
+                                        >
+                                            {label}
+                                        </a>
+                                    </li>
+                                ))}
                             </ul>
 
                             <a

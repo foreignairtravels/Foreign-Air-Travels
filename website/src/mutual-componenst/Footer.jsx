@@ -9,7 +9,6 @@ import {
   FiArrowUpRight,
   FiClock,
   FiMapPin,
-  FiPhone,
 } from 'react-icons/fi'
 import { FaFacebookF, FaInstagram, FaWhatsapp } from 'react-icons/fa'
 
@@ -209,15 +208,31 @@ const Footer = () => {
             </h2>
             <ul className="mt-5 space-y-4 text-[14px] leading-[22px] text-white/65">
               <li className="flex items-start gap-3">
-                <FiPhone
+                <FaWhatsapp
                   aria-hidden="true"
                   className="mt-[3px] size-4 shrink-0 text-[#ff8a61]"
                 />
                 <a
-                  href="tel:+9663017075427"
+                  href="https://wa.me/923017075427"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="transition-colors hover:text-white focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
                 >
                   0301 7075427
+                </a>
+              </li>
+              <li className="flex items-start gap-3">
+                <FaWhatsapp
+                  aria-hidden="true"
+                  className="mt-[3px] size-4 shrink-0 text-[#ff8a61]"
+                />
+                <a
+                  href="https://wa.me/923392923001"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="transition-colors hover:text-white focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                >
+                  0339 2923001
                 </a>
               </li>
               <li className="flex items-start gap-3">
@@ -240,9 +255,9 @@ const Footer = () => {
                   className="mt-[3px] size-4 shrink-0 text-[#ff8a61]"
                 />
                 <span>
-                  Mon–Sat, 10:00–18:00
+                  Monday to Saturday
                   <br />
-                  Sunday closed
+                  9:00 AM–6:00 PM
                 </span>
               </li>
               <li className="flex items-start gap-3">
@@ -255,7 +270,9 @@ const Footer = () => {
                   onClick={(event) => handleSectionLinkClick(event, 'contact')}
                   className="transition-colors hover:text-white focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
                 >
-                  Faisalabad, Pakistan
+                  Office 33, MEZ Floor, Centre Point Plaza,
+                  <br />
+                  Jaranwala Road, Faisalabad
                 </Link>
               </li>
             </ul>

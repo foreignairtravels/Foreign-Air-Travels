@@ -3,28 +3,31 @@ import {
   FiClock,
   FiMail,
   FiMapPin,
-  FiPhone,
 } from 'react-icons/fi'
 import { FaWhatsapp } from 'react-icons/fa'
 
 const CONTACT = {
   // Change only this address; the text and both map links will update automatically.
-  address: "Stayana Road near McDonald's, Faisalabad 38000, Pakistan",
+  address: 'Office 33, MEZ Floor, Centre Point Plaza, Jaranwala Road, Faisalabad',
   email: 'info@foreignairtravel.com',
   phone: {
     label: '0301 7075427',
-    href: 'tel:+9663017075427',
+    href: 'https://wa.me/923017075427',
+  },
+  additionalWhatsApp: {
+    label: '0339 2923001',
+    href: 'https://wa.me/923392923001',
   },
   whatsapp: {
     label: '+966 59 638 2847',
     href: 'https://wa.me/966596382847',
   },
-  hours: 'Mon–Sat, 10:00–18:00',
+  hours: 'Monday to Saturday, 9:00 AM–6:00 PM',
 }
 
 const TravelCta = () => {
-  const encodedAddress = encodeURIComponent(CONTACT.address)
-  const mapEmbedUrl = `https://www.google.com/maps?q=${encodedAddress}&output=embed`
+  const encodedAddress = encodeURIComponent(`${CONTACT.address}, Pakistan`)
+  const mapEmbedUrl = `https://www.google.com/maps?q=${encodedAddress}&z=17&output=embed`
   const mapDirectionsUrl = `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`
 
   return (
@@ -68,11 +71,11 @@ const TravelCta = () => {
             <ul className="divide-y divide-[#003366]/10">
               <li className="flex items-start gap-4 py-5">
                 <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[#f5f3ed] text-[#003366]">
-                  <FiPhone aria-hidden="true" className="size-[18px]" />
+                  <FaWhatsapp aria-hidden="true" className="size-[19px]" />
                 </span>
                 <div className="min-w-0 pt-0.5">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                    Call us
+                    WhatsApp
                   </p>
                   <a
                     href={CONTACT.phone.href}
@@ -98,6 +101,25 @@ const TravelCta = () => {
                     className="mt-1 inline-block text-[15px] font-semibold text-[#003366] transition-colors hover:text-[#e95f2d] focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#ff6b35] sm:text-[16px]"
                   >
                     {CONTACT.whatsapp.label}
+                  </a>
+                </div>
+              </li>
+
+              <li className="flex items-start gap-4 py-5">
+                <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[#f5f3ed] text-[#003366]">
+                  <FaWhatsapp aria-hidden="true" className="size-[19px]" />
+                </span>
+                <div className="min-w-0 pt-0.5">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                    WhatsApp
+                  </p>
+                  <a
+                    href={CONTACT.additionalWhatsApp.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-1 inline-block text-[15px] font-semibold text-[#003366] transition-colors hover:text-[#e95f2d] focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#ff6b35] sm:text-[16px]"
+                  >
+                    {CONTACT.additionalWhatsApp.label}
                   </a>
                 </div>
               </li>
@@ -143,7 +165,6 @@ const TravelCta = () => {
                 <p className="text-[13px] font-semibold text-[#003366]">
                   {CONTACT.hours}
                 </p>
-                <p className="mt-0.5 text-[12px] text-slate-500">Sunday closed</p>
               </div>
             </div>
           </div>
