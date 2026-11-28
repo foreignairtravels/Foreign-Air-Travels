@@ -34,6 +34,48 @@ const formatDate = (value) => {
 const formatFare = (currency, amount) =>
   `${currency || "SAR"} ${Number(amount || 0).toLocaleString("en-US")}`;
 
+function BookingCountdown({ booking }) {
+  const expiresAt = booking.expiresAt ? new Date(booking.expiresAt).getTime() : NaN;
+  const confirmed = Boolean(booking.confirmedAt) || booking.status === "confirmed";
+  const cancelled = booking.status === "cancelled";
+  const [now, setNow] = useState(null);
+
+  useEffect(() => {
+    if (!Number.isFinite(expiresAt) || confirmed || cancelled) return undefined;
+
+    let timeoutId;
+    const updateTime = () => {
+      const currentTime = Date.now();
+      setNow(currentTime);
+      if (currentTime < expiresAt) {
+        timeoutId = window.setTimeout(updateTime, 1000);
+      }
+    };
+
+    updateTime();
+    return () => window.clearTimeout(timeoutId);
+  }, [expiresAt, confirmed, cancelled]);
+
+  if (!Number.isFinite(expiresAt) || confirmed || cancelled) return null;
+
+  const secondsLeft = now === null ? null : Math.max(0, Math.ceil((expiresAt - now) / 1000));
+  const hours = secondsLeft === null ? "--" : String(Math.floor(secondsLeft / 3600)).padStart(2, "0");
+  const minutes = secondsLeft === null ? "--" : String(Math.floor((secondsLeft % 3600) / 60)).padStart(2, "0");
+  const seconds = secondsLeft === null ? "--" : String(secondsLeft % 60).padStart(2, "0");
+  const timeLeft = `${hours}:${minutes}:${seconds}`;
+
+  return (
+    <span
+      role="timer"
+      aria-label={`Time remaining: ${timeLeft}`}
+      className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-semibold text-[#FF6B35]"
+    >
+      <FiClock aria-hidden="true" />
+      {timeLeft}
+    </span>
+  );
+}
+
 export default function InquiriesPage() {
   const { getInquiries, getCustomers, updateInquiryStatus } = useApp();
   const [inquiries, setInquiries] = useState([]);
@@ -76,7 +118,15 @@ export default function InquiriesPage() {
     const { ok, data } = await updateInquiryStatus(bookingId, status);
     if (ok) {
       setInquiries((current) => current.map((inquiry) => (
-        inquiry._id === bookingId ? { ...inquiry, status } : inquiry
+        inquiry._id === bookingId
+          ? {
+              ...inquiry,
+              status,
+              ...(status === "confirmed" && !inquiry.confirmedAt
+                ? { confirmedAt: new Date().toISOString() }
+                : {}),
+            }
+          : inquiry
       )));
     } else {
       setActionError(data.message || "Inquiry status could not be updated.");
@@ -198,6 +248,7 @@ export default function InquiriesPage() {
                   </div>
 
                   <div className="flex items-center gap-2">
+                    <BookingCountdown booking={inquiry} />
                     <label className="sr-only" htmlFor={`inquiry-status-${inquiry._id}`}>Booking status</label>
                     <select
                       id={`inquiry-status-${inquiry._id}`}

@@ -716,6 +716,48 @@ function StatusBadge({ status }) {
   );
 }
 
+function BookingCountdown({ booking }) {
+  const expiresAt = booking.expiresAt ? new Date(booking.expiresAt).getTime() : NaN;
+  const confirmed = Boolean(booking.confirmedAt) || booking.status === "confirmed";
+  const cancelled = booking.status === "cancelled";
+  const [now, setNow] = useState(null);
+
+  useEffect(() => {
+    if (!Number.isFinite(expiresAt) || confirmed || cancelled) return undefined;
+
+    let timeoutId;
+    const updateTime = () => {
+      const currentTime = Date.now();
+      setNow(currentTime);
+      if (currentTime < expiresAt) {
+        timeoutId = window.setTimeout(updateTime, 1000);
+      }
+    };
+
+    updateTime();
+    return () => window.clearTimeout(timeoutId);
+  }, [expiresAt, confirmed, cancelled]);
+
+  if (!Number.isFinite(expiresAt) || confirmed || cancelled) return null;
+
+  const secondsLeft = now === null ? null : Math.max(0, Math.ceil((expiresAt - now) / 1000));
+  const hours = secondsLeft === null ? "--" : String(Math.floor(secondsLeft / 3600)).padStart(2, "0");
+  const minutes = secondsLeft === null ? "--" : String(Math.floor((secondsLeft % 3600) / 60)).padStart(2, "0");
+  const seconds = secondsLeft === null ? "--" : String(secondsLeft % 60).padStart(2, "0");
+  const timeLeft = `${hours}:${minutes}:${seconds}`;
+
+  return (
+    <span
+      role="timer"
+      aria-label={`Time remaining: ${timeLeft}`}
+      className="mt-2 flex w-fit items-center gap-1 whitespace-nowrap text-sm font-semibold text-[#FF6B35]"
+    >
+      <FiClock aria-hidden="true" />
+      {timeLeft}
+    </span>
+  );
+}
+
 function getConfirmedPassengerCounts(booking) {
   const counts = booking.passengerCounts || {};
   const confirmed =
@@ -1305,6 +1347,7 @@ export default function BookingsPage() {
                       </td>
                       <td className="min-w-0 overflow-hidden border-y border-l border-slate-200 bg-white px-3 py-4">
                         <StatusBadge status={booking.status} />
+                        <BookingCountdown booking={booking} />
                         {booking.confirmedAt && (
                           <p className="mt-2 break-words text-sm text-slate-600">
                             Confirmed: {formatDateTime(booking.confirmedAt)}
