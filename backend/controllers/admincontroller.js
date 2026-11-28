@@ -114,13 +114,22 @@ export const approveCustomer = async (req, res) => {
 
     if (!user.approvalEmailSentAt) {
       try {
+        const siteUrl = "https://www.foreignairtravel.com/";
+        const safeSiteUrl = escapeHtml(siteUrl);
+        const safeEmail = escapeHtml(user.email);
         await sendEmail({
           to: user.email,
           subject: "ForeignAirTravel: your account has been approved",
           html: `
-            <div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;padding:24px;color:#003366">
-              <h2>Hello ${escapeHtml(user.name)},</h2>
-              <p>Your ForeignAirTravel account has been approved. You can now sign in with your email and password.</p>
+            <div style="font-family:Arial,sans-serif;max-width:760px;margin:0 auto;padding:24px;color:#222">
+              <p style="margin:18px 0;color:#3b9349;font-size:16px;font-weight:bold;text-decoration:underline">Dear ${escapeHtml(user.name)}!</p>
+              <p style="margin:24px 0;color:#3b9349;font-weight:bold;text-decoration:underline">We are pleased to inform you that your registration has been approved by management.</p>
+              ${siteUrl ? `<p style="margin:20px 0;color:#3b9349;font-weight:bold;text-decoration:underline">Site URL: <a href="${safeSiteUrl}" style="color:#1767bd">${safeSiteUrl}</a></p>` : ""}
+              <p style="margin:20px 0"><strong>Name:</strong> ${escapeHtml(user.name)}</p>
+              <p style="margin:20px 0"><strong>Travel Agency Name:</strong> ${escapeHtml(user.agencyname)}</p>
+              <p style="margin:20px 0"><strong>Email:</strong> <a href="mailto:${safeEmail}" style="color:#1767bd">${safeEmail}</a></p>
+              <p style="margin:20px 0"><strong>Password:</strong> For your security, your password is not included in this email. Sign in with the password you chose during registration.</p>
+              <p style="margin:24px 0;color:#3b9349;font-weight:bold">Log in to ${siteUrl ? `<a href="${safeSiteUrl}" style="color:#1767bd">${safeSiteUrl}</a>` : "ForeignAirTravel"} and start booking with your approved account.</p>
             </div>
           `,
         });
