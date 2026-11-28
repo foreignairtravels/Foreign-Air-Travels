@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   FiCalendar,
   FiCheckCircle,
@@ -844,6 +844,10 @@ export default function BookingsPage() {
   const [viewingBooking, setViewingBooking] = useState(null);
   const [pdfError, setPdfError] = useState("");
   const [openingPdfId, setOpeningPdfId] = useState("");
+  const autoInvoiceId = useRef("");
+  const invoiceId = typeof window === "undefined"
+    ? ""
+    : new URLSearchParams(window.location.search).get("invoice") || "";
 
   const loadBookings = useCallback(async () => {
     setLoading(true);
@@ -875,13 +879,13 @@ export default function BookingsPage() {
     return () => window.cancelAnimationFrame(frame);
   }, [loadBookings]);
 
-  const openBookingPdfPreview = async (booking, includePrice) => {
+  const openBookingPdfPreview = useCallback(async (booking, includePrice, openInCurrentTab = false) => {
     setPdfError("");
     setOpeningPdfId(
       `${booking._id}-${includePrice ? "with-price" : "without-price"}`,
     );
-    const previewWindow = window.open("", "_blank");
-    if (!previewWindow) {
+    const previewWindow = openInCurrentTab ? null : window.open("", "_blank");
+    if (!openInCurrentTab && !previewWindow) {
       setPdfError(
         "Your browser blocked the new preview tab. Allow pop-ups for this website and try again.",
       );
@@ -889,11 +893,13 @@ export default function BookingsPage() {
       return;
     }
 
-    previewWindow.opener = null;
-    previewWindow.document.write(
-      '<!doctype html><html><head><title>Preparing itinerary</title></head><body style="font:16px Arial,sans-serif;padding:32px;color:#12314e">Preparing your itinerary preview...</body></html>',
-    );
-    previewWindow.document.close();
+    if (previewWindow) {
+      previewWindow.opener = null;
+      previewWindow.document.write(
+        '<!doctype html><html><head><title>Preparing itinerary</title></head><body style="font:16px Arial,sans-serif;padding:32px;color:#12314e">Preparing your itinerary preview...</body></html>',
+      );
+      previewWindow.document.close();
+    }
 
     try {
       const airlineLogo = await getLogoDataUrl(booking.ticketDetails.airlineLogo);
@@ -905,8 +911,11 @@ export default function BookingsPage() {
       );
       const previewUrl = URL.createObjectURL(blob);
       const safeFilename = filename.replace(/[^\w.-]/g, "_");
-      previewWindow.document.open();
-      previewWindow.document.write(`<!doctype html>
+      if (openInCurrentTab) {
+        window.location.assign(previewUrl);
+      } else {
+        previewWindow.document.open();
+        previewWindow.document.write(`<!doctype html>
         <html lang="en">
           <head>
             <meta charset="utf-8">
@@ -933,19 +942,34 @@ export default function BookingsPage() {
             <iframe src="${previewUrl}" title="Travel itinerary PDF preview"></iframe>
           </body>
         </html>`);
-      previewWindow.document.close();
-      previewWindow.addEventListener(
-        "beforeunload",
-        () => URL.revokeObjectURL(previewUrl),
-        { once: true },
-      );
+        previewWindow.document.close();
+        previewWindow.addEventListener(
+          "beforeunload",
+          () => URL.revokeObjectURL(previewUrl),
+          { once: true },
+        );
+      }
     } catch (error) {
-      previewWindow.close();
+      previewWindow?.close();
       setPdfError(error.message || "The PDF preview could not be created.");
     } finally {
       setOpeningPdfId("");
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    if (loading) return;
+    if (!invoiceId || autoInvoiceId.current === invoiceId) return;
+    const booking = bookings.find(
+      (item) => String(item._id).toLowerCase() === invoiceId.toLowerCase(),
+    );
+    if (!booking) return;
+    const frame = window.requestAnimationFrame(() => {
+      autoInvoiceId.current = invoiceId;
+      void openBookingPdfPreview(booking, true, true);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [bookings, invoiceId, loading, openBookingPdfPreview]);
 
   const updateStatus = async (booking, status) => {
     setSavingId(booking._id);
@@ -987,6 +1011,12 @@ export default function BookingsPage() {
     }
     return true;
   });
+  const invoiceUnavailable = Boolean(
+    invoiceId
+      && !loading
+      && !loadingError
+      && !bookings.some((item) => String(item._id).toLowerCase() === invoiceId.toLowerCase()),
+  );
 
   const openInvoicePreview = (booking, includePrice) => {
     void openBookingPdfPreview(booking, includePrice);
@@ -1076,12 +1106,12 @@ export default function BookingsPage() {
           {actionError}
         </p>
       )}
-      {pdfError && (
+      {(pdfError || invoiceUnavailable) && (
         <p
           role="alert"
           className="mb-4 rounded-xl bg-red-50 px-4 py-3 text-base text-red-700"
         >
-          {pdfError}
+          {pdfError || "This invoice is not available in your account."}
         </p>
       )}
 

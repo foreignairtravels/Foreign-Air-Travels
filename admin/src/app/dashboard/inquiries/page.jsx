@@ -128,6 +128,9 @@ export default function InquiriesPage() {
             }
           : inquiry
       )));
+      if (data.emailSent === false) {
+        setActionError(data.message || "Booking status updated, but the customer email could not be sent.");
+      }
     } else {
       setActionError(data.message || "Inquiry status could not be updated.");
     }

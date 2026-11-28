@@ -1,5 +1,6 @@
 import GroupBooking from '../models/groupbookingmodel.js';
 import GroupTicket from '../models/groupticketmodel.js';
+import { sendGroupBookingStatusEmail } from './groupBookingStatusEmail.js';
 
 export const expirePendingGroupBookings = async () => {
   const now = new Date();
@@ -24,7 +25,8 @@ export const expirePendingGroupBookings = async () => {
       { $set: { status: 'cancelled', stockReserved: false, autoCancelledAt: now } },
       { new: true }
     )
-      .select('_id ticket')
+      .select('_id ticket user passengers ticketDetails')
+      .populate('user', 'name email agencyname')
       .lean();
 
     if (!expired) continue;
@@ -41,6 +43,7 @@ export const expirePendingGroupBookings = async () => {
         await ticket.save();
       }
     }
+    await sendGroupBookingStatusEmail(expired, 'cancelled', { automaticCancellation: true });
     expiredCount += 1;
   }
 

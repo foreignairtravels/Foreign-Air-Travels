@@ -3,6 +3,7 @@ import GroupBooking from '../models/groupbookingmodel.js';
 import GroupTicket from '../models/groupticketmodel.js';
 import { expirePendingGroupBookings } from '../utils/groupBookingExpiry.js';
 import { uploadImageBuffer } from '../utils/cloudinary.js';
+import { sendGroupBookingStatusEmail } from '../utils/groupBookingStatusEmail.js';
 
 const bookingStatuses = ['pending', 'processing', 'on_hold', 'confirmed', 'cancelled', 'completed'];
 const BOOKING_HOLD_MS = 2 * 60 * 60 * 1000;
@@ -155,12 +156,16 @@ export const createGroupBooking = async (req, res) => {
     });
     bookingCreated = true;
 
+    const responseBooking = await populateBooking(GroupBooking.findById(booking._id)).lean();
+    const emailSent = await sendGroupBookingStatusEmail(responseBooking, 'on_hold');
+    const responseMessage = infantPriceOnCall && counts.infants
+      ? 'Booking submitted. The ticket is reserved for 2 hours while awaiting admin confirmation. Infant fare is on call.'
+      : 'Booking submitted. The ticket is reserved for 2 hours while awaiting admin confirmation.';
     res.status(201).json({
       success: true,
-      message: infantPriceOnCall && counts.infants
-        ? 'Booking submitted. The ticket is reserved for 2 hours while awaiting admin confirmation. Infant fare is on call.'
-        : 'Booking submitted. The ticket is reserved for 2 hours while awaiting admin confirmation.',
-      data: await populateBooking(GroupBooking.findById(booking._id)).lean(),
+      message: emailSent ? responseMessage : `${responseMessage} The booking email could not be sent.`,
+      emailSent,
+      data: responseBooking,
     });
   } catch (error) {
     if (reservedTicketId && bookingId && !bookingCreated) {
@@ -252,7 +257,8 @@ export const updateAdminGroupBookingStatus = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Select a valid booking status.' });
     }
 
-    const currentBooking = await GroupBooking.findById(id);
+    const currentBooking = await GroupBooking.findById(id)
+      .populate('user', 'name email agencyname');
     if (!currentBooking) return res.status(404).json({ success: false, message: 'Booking not found.' });
     if (currentBooking.status === 'cancelled' && status !== 'cancelled') {
       return res.status(409).json({ success: false, message: 'A cancelled booking cannot be reactivated.' });
@@ -303,7 +309,18 @@ export const updateAdminGroupBookingStatus = async (req, res) => {
         await reservedTicket.save();
       }
     }
-    res.json({ success: true, message: 'Booking status updated.', data: booking });
+    const statusChanged = currentBooking.status !== status;
+    const emailSent = statusChanged && ['confirmed', 'cancelled'].includes(status)
+      ? await sendGroupBookingStatusEmail(currentBooking, status)
+      : undefined;
+    res.json({
+      success: true,
+      message: emailSent === false
+        ? 'Booking status updated, but the customer email could not be sent.'
+        : 'Booking status updated.',
+      ...(emailSent === undefined ? {} : { emailSent }),
+      data: booking,
+    });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
   }
