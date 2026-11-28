@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { FiSend, FiPlus, FiEdit2, FiTrash2 } from "react-icons/fi";
+import { FaPlane } from "react-icons/fa";
 import PageHeader from "@/components/dashboard/PageHeader";
 import EmptyState from "@/components/dashboard/EmptyState";
 import AirlineForm from "@/components/dashboard/AirlineForm";
@@ -31,8 +32,27 @@ export default function AirlinesPage() {
     }, [getAirlines]);
 
     useEffect(() => {
-        loadAirlines();
-    }, [loadAirlines]);
+        let active = true;
+        getAirlines()
+            .then(({ ok, data }) => {
+                if (!active) return;
+                if (ok) {
+                    setAirlines(data.data);
+                    setListError("");
+                } else {
+                    setListError(data.message || "Unable to load airlines.");
+                }
+            })
+            .catch((error) => {
+                if (active) setListError(error.message || "Unable to load airlines.");
+            })
+            .finally(() => {
+                if (active) setLoading(false);
+            });
+        return () => {
+            active = false;
+        };
+    }, [getAirlines]);
 
     const openCreate = () => {
         setEditing(null);
@@ -100,8 +120,14 @@ export default function AirlinesPage() {
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     {airlines.map((item) => (
                         <div key={item._id} className="rounded-2xl bg-white p-4 shadow-sm">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={item.logo} alt={item.name} className="h-14 w-28 object-contain object-left" />
+                            {item.logo ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={item.logo} alt={item.name} className="h-14 w-28 object-contain object-left" />
+                            ) : (
+                                <span className="flex h-14 w-28 items-center text-2xl text-[#003366]/50">
+                                    <FaPlane aria-hidden="true" />
+                                </span>
+                            )}
 
                             <h3 className="mt-4 truncate text-base font-semibold text-[#003366]">{item.name}</h3>
                             <p className="mt-1 line-clamp-2 text-sm text-[#003366]/70">{item.network}</p>

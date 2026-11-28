@@ -130,14 +130,18 @@ const AirlinePartners = () => {
 
               <div className="flex items-start justify-between gap-4">
                 <span className="relative h-[54px] w-[96px] shrink-0">
-                  <Image
-                    src={logo}
-                    alt={`${name} logo`}
-                    fill
-                    sizes="96px"
-                    unoptimized
-                    className="object-contain object-left grayscale opacity-70 transition duration-300 group-hover:opacity-100 group-hover:grayscale-0"
-                  />
+                  {logo ? (
+                    <Image
+                      src={logo}
+                      alt={`${name} logo`}
+                      fill
+                      sizes="96px"
+                      unoptimized
+                      className="object-contain object-left grayscale opacity-70 transition duration-300 group-hover:opacity-100 group-hover:grayscale-0"
+                    />
+                  ) : (
+                    <FaPlane aria-hidden="true" className="mt-4 size-6 text-[#003366]/50" />
+                  )}
                 </span>
                 <span className="flex size-9 items-center justify-center rounded-full border border-slate-200 text-[#003366]">
                   <FaPlane

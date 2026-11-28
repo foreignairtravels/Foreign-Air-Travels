@@ -106,8 +106,49 @@ const applySourceTickets = async (integration, tickets) => {
     }
     categoryIdsBySourceSlug.set(slug, categoryId);
   }
-  const airlines = await Airline.find().select('name').lean();
-  const airlineIds = new Map(airlines.map((airline) => [airline.name.trim().toLowerCase(), airline._id]));
+  const airlines = await Airline.find().sort({ createdAt: 1 }).select('name').lean();
+  const airlineIds = new Map();
+  for (const airline of airlines) {
+    const key = airline.name.trim().toLowerCase();
+    if (key && !airlineIds.has(key)) airlineIds.set(key, airline._id);
+  }
+  const sourceAirlines = new Map();
+  for (const ticket of tickets) {
+    const key = ticket.airline.trim().toLowerCase();
+    if (!key) continue;
+    let sourceAirline = sourceAirlines.get(key);
+    if (!sourceAirline) {
+      sourceAirline = {
+        name: ticket.airline.trim(),
+        logo: ticket.airlineLogo || '',
+        network: new Set(),
+      };
+      sourceAirlines.set(key, sourceAirline);
+    }
+    for (const segment of ticket.segments) {
+      if (segment.from) sourceAirline.network.add(segment.from.trim());
+      if (segment.to) sourceAirline.network.add(segment.to.trim());
+    }
+  }
+  for (const [key, sourceAirline] of sourceAirlines) {
+    if (airlineIds.has(key)) continue;
+    const airline = await Airline.findOneAndUpdate(
+      { name: sourceAirline.name },
+      {
+        $setOnInsert: {
+          name: sourceAirline.name,
+          network: [...sourceAirline.network].join(' · ') || sourceAirline.name,
+          logo: sourceAirline.logo,
+        },
+      },
+      {
+        upsert: true,
+        returnDocument: 'after',
+        collation: { locale: 'en', strength: 2 },
+      }
+    );
+    airlineIds.set(key, airline._id);
+  }
   const receivedIds = new Set(tickets.map((ticket) => ticket.sourceId));
   const operations = tickets.map((ticket) => {
     const previous = existingBySourceId.get(ticket.sourceId);
@@ -116,7 +157,7 @@ const applySourceTickets = async (integration, tickets) => {
       field,
       priceOverrides[field] ? previous[field] : ticket.sourceFares[field],
     ]));
-    const airlineId = airlineIds.get(ticket.airline.toLowerCase());
+    const airlineId = airlineIds.get(ticket.airline.trim().toLowerCase());
     const set = {
       sourceIntegration: integration._id,
       sourceTicketId: ticket.sourceId,
