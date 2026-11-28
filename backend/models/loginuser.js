@@ -11,6 +11,7 @@ const userSchema = new mongoose.Schema(
         isVerified: { type: Boolean, default: false },
         profileImage: { type: String, default: "" },
         companyLogo: { type: String, default: "" },
+        signupNotificationSentAt: { type: Date },
         pendingProfileUpdate: {
             name: { type: String, trim: true },
             agencyname: { type: String, trim: true },

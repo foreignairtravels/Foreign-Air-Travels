@@ -8,6 +8,14 @@ import { uploadImageBuffer } from "../utils/cloudinary.js";
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const NUMBER_REGEX = /^[0-9+\-\s()]{7,20}$/;
 const getJwtSecret = () => process.env.JWT_SECRET || process.env.jwt_secret;
+const escapeHtml = (value) =>
+  String(value ?? "").replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  })[character]);
 
 const PROFILE_APPROVAL_FIELDS = ["agencyname", "name", "number"];
 const EDITABLE_FIELDS = [...PROFILE_APPROVAL_FIELDS, "city"];
@@ -81,8 +89,9 @@ export const register = async (req, res) => {
     }
 
     // Keep an existing pending account and its password unchanged.
+    let user = existing;
     if (!existing) {
-      await User.create({
+      user = await User.create({
         agencyname,
         name,
         number,
@@ -90,6 +99,50 @@ export const register = async (req, res) => {
         email,
         password: await bcrypt.hash(password, 12),
       });
+    }
+
+    if (!user.signupNotificationSentAt) {
+      try {
+        const adminEmail = String(process.env.ADMIN_EMAIL || "").trim();
+        if (!adminEmail) {
+          const error = new Error("ADMIN_EMAIL is required to notify the administrator.");
+          error.code = "ADMIN_EMAIL_MISSING";
+          throw error;
+        }
+
+        const siteUrl = "https://foreign-air-travels-admin.vercel.app/";
+        const safeSiteUrl = escapeHtml(siteUrl);
+        const safeEmail = escapeHtml(user.email);
+        await sendEmail({
+          to: adminEmail,
+          subject: "ForeignAirTravel: new signup request",
+          html: `
+            <div style="font-family:Arial,sans-serif;max-width:760px;margin:0 auto;padding:24px;color:#222">
+              <p style="margin:18px 0;color:#3b9349;font-size:16px;font-weight:bold;text-decoration:underline">Dear Admin!</p>
+              <p style="margin:24px 0;color:#3b9349;font-weight:bold;text-decoration:underline">A new website registration request is awaiting administrator approval.</p>
+              <p style="margin:20px 0;color:#3b9349;font-weight:bold;text-decoration:underline">Site URL: <a href="${safeSiteUrl}" style="color:#1767bd">${safeSiteUrl}</a></p>
+              <p style="margin:20px 0"><strong>Name:</strong> ${escapeHtml(user.name)}</p>
+              <p style="margin:20px 0"><strong>Travel Agency Name:</strong> ${escapeHtml(user.agencyname)}</p>
+              <p style="margin:20px 0"><strong>Phone:</strong> ${escapeHtml(user.number)}</p>
+              <p style="margin:20px 0"><strong>City:</strong> ${escapeHtml(user.city)}</p>
+              <p style="margin:20px 0"><strong>Email:</strong> <a href="mailto:${safeEmail}" style="color:#1767bd">${safeEmail}</a></p>
+              <p style="margin:24px 0;color:#3b9349;font-weight:bold">Review this request in the admin panel and approve it there.</p>
+            </div>
+          `,
+        });
+        user.signupNotificationSentAt = new Date();
+        await user.save();
+      } catch (emailError) {
+        console.error("New signup notification email failed:", {
+          code: emailError.code,
+          responseCode: emailError.responseCode,
+          message: emailError.message,
+        });
+        return res.status(502).json({
+          success: false,
+          message: "Your signup request was saved, but the admin notification email could not be sent. Please try again later.",
+        });
+      }
     }
 
     res.status(201).json({
