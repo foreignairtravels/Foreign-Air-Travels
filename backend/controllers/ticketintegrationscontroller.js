@@ -123,6 +123,7 @@ const applySourceTickets = async (integration, tickets) => {
       category: categoryIdsBySourceSlug.get(ticket.sourceCategorySlug.toLowerCase()),
       airline: ticket.airline,
       airlineLogo: ticket.airlineLogo,
+      ...(ticket.pnr ? { pnr: ticket.pnr } : {}),
       ...(airlineId ? { airlineId } : {}),
       groupName: ticket.groupName,
       departureDate: ticket.departureDate,
@@ -313,7 +314,7 @@ export const exportGroupTickets = async (req, res) => {
     }
     const tickets = filter
       ? await GroupTicket.find(filter).select(
-        'airline airlineLogo groupName departureDate segments baggage stock mealAvailable adultFare childFare infantFare infantPriceOnCall currency isAvailable'
+        'airline airlineLogo groupName pnr departureDate segments baggage stock mealAvailable adultFare childFare infantFare infantPriceOnCall currency isAvailable'
       ).populate('category', 'name slug image logo').lean()
       : [];
     res.set('Cache-Control', 'no-store');
@@ -332,6 +333,7 @@ export const exportGroupTickets = async (req, res) => {
         airline: ticket.airline,
         airlineLogo: ticket.airlineLogo,
         groupName: ticket.groupName,
+        pnr: ticket.pnr,
         departureDate: ticket.departureDate,
         segments: ticket.segments,
         baggage: ticket.baggage,

@@ -119,6 +119,7 @@ export const normalizeIntegrationPayload = (payload, selectedCategorySlug = '') 
     const sourceId = text(ticket.sourceId || ticket._id, 'sourceId', 120);
     const sourceCategorySlug = String(ticket.category?.slug || ticket.categorySlug || '').trim().toLowerCase();
     const sourceCategory = categoriesBySlug.get(sourceCategorySlug);
+    const pnr = String(ticket.pnr || ticket.PNR || '').trim();
     const departureDate = new Date(ticket.departureDate);
     if (!sourceId || seenIds.has(sourceId)) throw new Error('Source tickets must have unique sourceId values.');
     seenIds.add(sourceId);
@@ -178,6 +179,7 @@ export const normalizeIntegrationPayload = (payload, selectedCategorySlug = '') 
       airline: text(ticket.airline, 'airline name', 120),
       airlineLogo: String(ticket.airlineLogo || '').trim().slice(0, 2048),
       groupName: text(ticket.groupName, 'group name', 200),
+      ...(pnr ? { pnr } : {}),
       departureDate,
       segments,
       baggage: text(ticket.baggage, 'baggage', 200),
@@ -371,12 +373,14 @@ export const fetchAlHaiderTickets = async (baseUrl, token, selectedCategorySlug 
     const availableSeats = String(group.available_no_of_pax ?? '').trim()
       ? sourceNumber(group.available_no_of_pax)
       : NaN;
+    const pnr = String(group.pnr || group.PNR || '').trim();
     data.push({
       sourceId: String(group.id),
       categorySlug,
       airline: airlineName,
       airlineLogo: String(airline?.logo_url || ''),
       groupName: ([group.sector, type].filter(Boolean).join(' · ') || `Group ${group.id}`).slice(0, 200),
+      ...(pnr ? { pnr } : {}),
       departureDate: group.dept_date,
       segments: details.map((detail) => ({
         from: detail.origin,

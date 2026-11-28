@@ -179,7 +179,8 @@ function createBookingPdf(
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 13;
   const contentWidth = pageWidth - margin * 2;
-  const bookingReference = booking._id.slice(-8).toUpperCase();
+  const bookingId = String(booking._id).toUpperCase();
+  const pnr = String(details.pnr || booking.ticket?.pnr || "").trim();
   const dateText = (value) => {
     const date = new Date(value);
     return Number.isNaN(date.getTime())
@@ -350,7 +351,7 @@ function createBookingPdf(
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7.5);
     doc.setTextColor(...colors.muted);
-    doc.text(`Booking reference: ${bookingReference}`, margin, pageHeight - 9);
+    doc.text(`Booking ID: ${bookingId}`, margin, pageHeight - 9);
     doc.text("Travel itinerary", pageWidth - margin, pageHeight - 9, {
       align: "right",
     });
@@ -396,8 +397,8 @@ function createBookingPdf(
   const cellWidth = contentWidth / 3;
   const metadataRows = [
     [
-      { label: "BOOKING REFERENCE (PNR)", value: bookingReference },
-      { label: "BOOKING ID", value: `BK-${bookingReference}` },
+      { label: "BOOKING REFERENCE (PNR)", value: pnr },
+      { label: "BOOKING ID", value: bookingId },
       { label: "STATUS", value: getStatusLabel(booking.status) },
     ],
     [
@@ -474,8 +475,8 @@ function createBookingPdf(
       }
       setColor("navy");
       doc.text(value, x + 3, y + (rowIndex === 0 ? 11.5 : 12));
-      if (rowIndex === 0 && columnIndex === 0) {
-        drawBookingBarcode(doc, bookingReference, x + 3, y + 14, 45, 5);
+      if (rowIndex === 0 && columnIndex === 0 && pnr) {
+        drawBookingBarcode(doc, pnr, x + 3, y + 14, 45, 5);
       }
     });
     y += rowHeight;
@@ -693,7 +694,7 @@ function createBookingPdf(
 
   return {
     blob: doc.output("blob"),
-    filename: `group-booking-${bookingReference}-${includePrice ? "with-price" : "without-price"}.pdf`,
+    filename: `group-booking-${bookingId}-${includePrice ? "with-price" : "without-price"}.pdf`,
   };
 }
 
@@ -1186,10 +1187,7 @@ export default function BookingsPage() {
                           <span className="font-bold text-[#2f70b3]">
                             Airline PNR #:
                           </span>{" "}
-                          {details.segments
-                            .map((segment) => segment.flightNumber)
-                            .filter(Boolean)
-                            .join(", ") || "Not provided"}
+                          {details.pnr || booking.ticket?.pnr || "—"}
                         </p>
                         <p className="mt-1 break-words">
                           <span className="font-bold text-[#2f70b3]">

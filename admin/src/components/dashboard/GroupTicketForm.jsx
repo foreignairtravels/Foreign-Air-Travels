@@ -26,6 +26,7 @@ export default function GroupTicketForm({ initial, categories, airlines, saving,
     airline: isSyncedTicket ? initial?.airline || initial?.airlineId?.name || "" : initial?.airlineId?.name || initial?.airline || "",
     airlineLogo: isSyncedTicket ? initial?.airlineLogo || initial?.airlineId?.logo || "" : initial?.airlineId?.logo || initial?.airlineLogo || "",
     groupName: initial?.groupName || "",
+    pnr: initial?.pnr || "",
     departureDate: toDateInput(initial?.departureDate),
     segments: initial?.segments?.length ? initial.segments.map((segment) => ({ ...segment })) : [{ ...emptySegment }],
     baggage: initial?.baggage || "",
@@ -70,6 +71,7 @@ export default function GroupTicketForm({ initial, categories, airlines, saving,
       infantFare: Number(form.infantFare || 0),
       stock: Number(form.stock),
       currency: form.currency.trim().toUpperCase(),
+      pnr: form.pnr.trim(),
       segments: form.segments.map((segment) => ({
         ...segment,
         from: segment.from.trim(),
@@ -81,6 +83,7 @@ export default function GroupTicketForm({ initial, categories, airlines, saving,
       delete body.airlineId;
       delete body.airline;
       delete body.airlineLogo;
+      if (!body.pnr) delete body.pnr;
     }
     onSubmit(body);
   };
@@ -107,6 +110,7 @@ export default function GroupTicketForm({ initial, categories, airlines, saving,
             </select>
           </Field>
           <Field label="Group / route name"><input name="groupName" value={form.groupName} onChange={setValue} required className={inputClass} placeholder="Dammam to Peshawar" /></Field>
+          <Field label="Airline PNR"><input name="pnr" value={form.pnr} onChange={setValue} required={!isSyncedTicket} className={inputClass} placeholder="Enter the actual PNR" /></Field>
           <Field label="Departure date"><input name="departureDate" type="date" value={form.departureDate} onChange={setValue} required className={inputClass} /></Field>
 
           {form.airlineLogo && (

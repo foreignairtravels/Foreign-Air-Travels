@@ -13,6 +13,7 @@ const ticketFields = (body) => {
     'airline',
     'airlineLogo',
     'groupName',
+    'pnr',
     'departureDate',
     'segments',
     'baggage',
@@ -53,7 +54,7 @@ export const getGroupTickets = async (req, res) => {
 
     const projection = req.query.all === 'true'
       ? '-reservedBooking'
-      : '-reservedBooking -sourceIntegration -sourceTicketId -sourceFares -priceOverrides -sourceAvailable';
+      : '-reservedBooking -sourceIntegration -sourceTicketId -sourceFares -priceOverrides -sourceAvailable -pnr';
     const tickets = await GroupTicket.find(filter)
       .select(projection)
       .populate('category', 'name slug logo tagline')
@@ -68,6 +69,10 @@ export const getGroupTickets = async (req, res) => {
 export const createGroupTicket = async (req, res) => {
   try {
     const fields = ticketFields(req.body);
+    fields.pnr = String(fields.pnr ?? '').trim();
+    if (!fields.pnr) {
+      return res.status(400).json({ success: false, message: 'Enter the actual airline PNR.' });
+    }
     if (!mongoose.isValidObjectId(fields.category)) {
       return res.status(400).json({ success: false, message: 'Select a valid category' });
     }
@@ -104,6 +109,10 @@ export const updateGroupTicket = async (req, res) => {
     if (!existing) return res.status(404).json({ success: false, message: 'Group ticket not found' });
 
     const updates = ticketFields(req.body);
+    if (updates.pnr !== undefined) updates.pnr = String(updates.pnr).trim();
+    if (!existing.sourceIntegration && updates.pnr !== undefined && !updates.pnr) {
+      return res.status(400).json({ success: false, message: 'Enter the actual airline PNR.' });
+    }
     if (existing.sourceIntegration) {
       for (const field of ['adultFare', 'childFare', 'infantFare']) {
         if (updates[field] === undefined || Number(updates[field]) === Number(existing[field])) continue;

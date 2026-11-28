@@ -177,7 +177,10 @@ export default function GroupTicketsPage() {
                   <div className="min-w-0 space-y-0.5 text-xs text-[#003366]/75">
                     {ticket.segments.map((segment, index) => <p key={`${segment.flightNumber}-${index}`} className="truncate">{segment.from} → {segment.to} · {segment.flightNumber} · {segment.departureTime || "Time TBA"}</p>)}
                   </div>
-                  <p className="min-w-0 whitespace-normal break-words text-xs font-semibold text-[#003366]">{ticket.currency} {Number(ticket.adultFare).toLocaleString()} adult · {ticket.baggage} baggage · Stock: {ticket.stock ?? "—"}</p>
+                  <div className="min-w-0 space-y-1 text-xs font-semibold text-[#003366]">
+                    <p className="break-all">PNR: {ticket.pnr || "—"}</p>
+                    <p className="whitespace-normal break-words">{ticket.currency} {Number(ticket.adultFare).toLocaleString()} adult · {ticket.baggage} baggage · Stock: {ticket.stock ?? "—"}</p>
+                  </div>
                   <div className="flex gap-3 sm:w-40">
                     <button onClick={() => openForm(ticket)} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-[#EDEEE9] px-3 py-2 text-xs font-medium text-[#003366] hover:bg-[#003366] hover:text-white"><FiEdit2 /> Edit</button>
                     {!ticket.sourceIntegration && <button onClick={() => handleDelete(ticket)} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-600 hover:text-white"><FiTrash2 /> Delete</button>}

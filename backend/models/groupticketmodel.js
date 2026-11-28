@@ -27,6 +27,7 @@ const groupTicketSchema = new mongoose.Schema(
     airline: { type: String, required: true, trim: true },
     airlineLogo: { type: String, default: '' },
     groupName: { type: String, required: true, trim: true },
+    pnr: { type: String, default: '', trim: true },
     departureDate: { type: Date, required: true },
     segments: { type: [segmentSchema], required: true, validate: [(items) => items.length > 0, 'At least one flight segment is required'] },
     baggage: { type: String, required: true, trim: true },

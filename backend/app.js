@@ -42,14 +42,14 @@ app.use('/api/group-bookings', groupBookingRoutes);
 
 
 
-app.get("/", (req, res) => {
-    res.send("API is running...");
-});
-
-// const port = process.env.PORT || 5000;
-// app.listen(port, () => {
-//     console.log(`Server is running on port ${port}`);
+// app.get("/", (req, res) => {
+//     res.send("API is running...");
 // });
+
+const port = process.env.PORT || 5000;
+app.listen(port, () => {
+    console.log(`Server is running on port ${port}`);
+});
 
 
 export default app;

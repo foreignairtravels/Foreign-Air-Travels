@@ -26,6 +26,7 @@ const groupBookingSchema = new mongoose.Schema(
       airlineLogo: { type: String, default: '' },
       category: { type: String, required: true },
       groupName: { type: String, required: true },
+      pnr: { type: String, default: '' },
       departureDate: { type: Date, required: true },
       segments: [{
         from: { type: String, required: true },

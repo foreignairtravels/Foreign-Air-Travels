@@ -12,13 +12,14 @@ const validDate = (value) => !Number.isNaN(new Date(value).getTime());
 
 const populateBooking = (query) => query
   .populate('user', 'name email number agencyname')
-  .populate('ticket', 'airline airlineLogo groupName departureDate segments baggage mealAvailable currency adultFare childFare infantFare infantPriceOnCall');
+  .populate('ticket', 'airline airlineLogo groupName pnr departureDate segments baggage mealAvailable currency adultFare childFare infantFare infantPriceOnCall');
 
 const getTicketSnapshot = (ticket) => ({
   airline: ticket.airlineId?.name || ticket.airline,
   airlineLogo: ticket.airlineId?.logo || ticket.airlineLogo || '',
   category: ticket.category?.name || 'Group ticket',
   groupName: ticket.groupName,
+  pnr: ticket.pnr || '',
   departureDate: ticket.departureDate,
   segments: ticket.segments.map((segment) => ({
     from: segment.from,
